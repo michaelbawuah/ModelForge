@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Build artifacts
+build/
+dist/
+
+# Model artifacts
+artifacts/
+*.pt
+*.pth
+*.pkl
+*.joblib
+
+# Logs
+*.log
+logs/

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from modelforge.services.runtimes import (
+    RuntimeAlreadyRegisteredError,
     RuntimeNotFoundError,
     RuntimeRegistry,
 )
@@ -51,3 +52,29 @@ def test_empty_framework_cannot_be_registered() -> None:
 
     with pytest.raises(ValueError, match="cannot be empty"):
         registry.register("   ", FakeRuntime())
+
+
+def test_runtime_cannot_be_silently_replaced() -> None:
+    registry = RuntimeRegistry()
+
+    registry.register("pytorch", FakeRuntime())
+
+    with pytest.raises(
+        RuntimeAlreadyRegisteredError,
+        match="already registered",
+    ):
+        registry.register("PYTORCH", FakeRuntime())
+
+
+def test_frameworks_returns_deterministic_registered_names() -> None:
+    registry = RuntimeRegistry()
+
+    registry.register("Fluxion", FakeRuntime())
+    registry.register("ONNX", FakeRuntime())
+    registry.register("PyTorch", FakeRuntime())
+
+    assert registry.frameworks() == (
+        "fluxion",
+        "onnx",
+        "pytorch",
+    )

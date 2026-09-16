@@ -5,13 +5,17 @@ from __future__ import annotations
 import io
 import json
 import uuid
+from pathlib import Path
 
+import pytest
+import torch
 from fastapi.testclient import TestClient
 
 from modelforge.api.app import app
 from modelforge.api.inference import get_inference_service
 from modelforge.api.registry import get_artifact_store
 from modelforge.services.artifacts import LocalArtifactStore
+from modelforge.services.pytorch_runtime import LinearModel
 
 client = TestClient(app)
 
@@ -208,6 +212,7 @@ def test_unknown_environment_cannot_serve_predictions() -> None:
     assert response.status_code == 404
     assert "no active deployment" in response.json()["detail"].lower()
 
+
 def test_cached_model_survives_artifact_removal(tmp_path) -> None:
     """A verified cached model does not require rereading its artifact."""
 
@@ -236,9 +241,6 @@ def test_cached_model_survives_artifact_removal(tmp_path) -> None:
     assert first_response.json()["cache_hit"] is False
 
     artifact_uri = resources["version"]["artifact_uri"]
-
-    from pathlib import Path
-
     Path(artifact_uri).unlink()
 
     second_response = client.post(
@@ -266,4 +268,137 @@ def test_cached_model_survives_artifact_removal(tmp_path) -> None:
     assert third_response.status_code == 503
     assert "does not exist" in third_response.json()["detail"].lower()
 
+    app.dependency_overrides.clear()
+
+
+def test_pytorch_model_serves_through_full_deployment_lifecycle(
+    tmp_path,
+) -> None:
+    """A PyTorch artifact can be uploaded, deployed, cached, and served."""
+
+    environment = _unique_name("pytorch-production")
+    model_name = _unique_name("pytorch-model")
+
+    artifact_store = LocalArtifactStore(tmp_path / "artifacts")
+    app.dependency_overrides[get_artifact_store] = lambda: artifact_store
+
+    model = LinearModel(
+        input_features=2,
+        output_features=1,
+    )
+
+    with torch.no_grad():
+        model.linear.weight.copy_(
+            torch.tensor(
+                [[2.0, 3.0]],
+                dtype=torch.float32,
+            )
+        )
+        model.linear.bias.copy_(
+            torch.tensor(
+                [1.0],
+                dtype=torch.float32,
+            )
+        )
+
+    artifact_path = tmp_path / "trained-model.pt"
+
+    torch.save(
+        {
+            "format_version": 1,
+            "architecture": "linear",
+            "config": {
+                "input_features": 2,
+                "output_features": 1,
+            },
+            "state_dict": model.state_dict(),
+        },
+        artifact_path,
+    )
+
+    create_model_response = client.post(
+        "/models",
+        json={
+            "name": model_name,
+            "description": "End-to-end PyTorch inference test model.",
+        },
+    )
+
+    assert create_model_response.status_code == 201
+    model_id = create_model_response.json()["id"]
+
+    with artifact_path.open("rb") as artifact_file:
+        upload_response = client.post(
+            f"/models/{model_id}/artifacts",
+            data={
+                "version": "1.0.0",
+                "framework": "pytorch",
+            },
+            files={
+                "artifact": (
+                    "trained-model.pt",
+                    artifact_file,
+                    "application/octet-stream",
+                )
+            },
+        )
+
+    assert upload_response.status_code == 201
+    model_version = upload_response.json()
+
+    deployment_response = client.post(
+        "/deployments",
+        json={
+            "model_version_id": model_version["id"],
+            "environment": environment,
+        },
+    )
+
+    assert deployment_response.status_code == 201
+    deployment = deployment_response.json()
+
+    promote_response = client.post(
+        f"/deployments/{deployment['id']}/promote"
+    )
+
+    assert promote_response.status_code == 200
+
+    service = get_inference_service()
+    service.clear_cache()
+
+    first_prediction = client.post(
+        "/predict",
+        json={
+            "environment": environment,
+            "inputs": [4.0, 5.0],
+        },
+    )
+
+    assert first_prediction.status_code == 200
+    first_payload = first_prediction.json()
+
+    assert first_payload["prediction"] == pytest.approx(24.0)
+    assert first_payload["environment"] == environment
+    assert first_payload["deployment_id"] == deployment["id"]
+    assert first_payload["model_version_id"] == model_version["id"]
+    assert first_payload["model_version"] == "1.0.0"
+    assert first_payload["framework"] == "pytorch"
+    assert first_payload["cache_hit"] is False
+
+    second_prediction = client.post(
+        "/predict",
+        json={
+            "environment": environment,
+            "inputs": [1.0, 2.0],
+        },
+    )
+
+    assert second_prediction.status_code == 200
+    second_payload = second_prediction.json()
+
+    assert second_payload["prediction"] == pytest.approx(9.0)
+    assert second_payload["model_version_id"] == model_version["id"]
+    assert second_payload["cache_hit"] is True
+
+    service.clear_cache()
     app.dependency_overrides.clear()

@@ -21,6 +21,7 @@ from modelforge.services.inference import (
 )
 from modelforge.services.json_runtime import JsonModelRuntime
 from modelforge.services.model_cache import ModelCache
+from modelforge.services.pytorch_runtime import PyTorchRuntime
 from modelforge.services.runtimes import (
     RuntimeNotFoundError,
     RuntimeRegistry,
@@ -32,6 +33,7 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 
 _runtime_registry = RuntimeRegistry()
 _runtime_registry.register("modelforge-json", JsonModelRuntime())
+_runtime_registry.register("pytorch", PyTorchRuntime())
 
 _model_cache = ModelCache()
 

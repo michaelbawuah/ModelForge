@@ -30,8 +30,12 @@ class RuntimeNotFoundError(Exception):
     """Raised when no runtime supports a model framework."""
 
 
+class RuntimeAlreadyRegisteredError(Exception):
+    """Raised when a framework already has a registered runtime."""
+
+
 class RuntimeRegistry:
-    """Map model framework names to inference runtime implementations."""
+    """Map normalized framework names to runtime implementations."""
 
     def __init__(self) -> None:
         self._runtimes: dict[str, ModelRuntime] = {}
@@ -41,19 +45,22 @@ class RuntimeRegistry:
         framework: str,
         runtime: ModelRuntime,
     ) -> None:
-        """Register one runtime under a normalized framework name."""
+        """Register one runtime without silently replacing another."""
 
-        normalized = framework.strip().lower()
+        normalized = self._normalize(framework)
 
-        if not normalized:
-            raise ValueError("framework cannot be empty.")
+        if normalized in self._runtimes:
+            raise RuntimeAlreadyRegisteredError(
+                f"An inference runtime is already registered for "
+                f"framework '{normalized}'."
+            )
 
         self._runtimes[normalized] = runtime
 
     def get(self, framework: str) -> ModelRuntime:
         """Return the runtime registered for a framework."""
 
-        normalized = framework.strip().lower()
+        normalized = self._normalize(framework)
 
         try:
             return self._runtimes[normalized]
@@ -62,3 +69,17 @@ class RuntimeRegistry:
                 f"No inference runtime is registered for framework "
                 f"'{framework}'."
             ) from exc
+
+    def frameworks(self) -> tuple[str, ...]:
+        """Return registered framework names in deterministic order."""
+
+        return tuple(sorted(self._runtimes))
+
+    @staticmethod
+    def _normalize(framework: str) -> str:
+        normalized = framework.strip().lower()
+
+        if not normalized:
+            raise ValueError("framework cannot be empty.")
+
+        return normalized

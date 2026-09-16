@@ -1,4 +1,4 @@
-"""End-to-end test for externally supplied ModelForge runtimes."""
+"""End-to-end test for externally supplied ModelForge runtime plugins."""
 
 from __future__ import annotations
 
@@ -14,9 +14,13 @@ from modelforge.api.app import app
 from modelforge.api.inference import get_inference_service
 from modelforge.api.registry import get_artifact_store
 from modelforge.services.artifacts import LocalArtifactStore
+from modelforge.services.external_runtime_registry import (
+    ExternalRuntimeRegistry,
+)
 from modelforge.services.inference import InferenceService
 from modelforge.services.model_cache import ModelCache
 from modelforge.services.runtime_bootstrap import create_runtime_registry
+from modelforge.services.runtime_resolver import RuntimeResolver
 from modelforge.services.runtimes import RuntimePlugin
 
 
@@ -84,10 +88,15 @@ def test_unknown_plugin_runtime_serves_through_modelforge(
 
     assert "future-ai" in registry.frameworks()
 
-    plugin_service = InferenceService(
+    resolver = RuntimeResolver(
         runtimes=registry,
-        cache=ModelCache(),
+        external_runtimes=ExternalRuntimeRegistry(),
     )
+
+    plugin_service = InferenceService(
+    resolver=resolver,
+    cache=ModelCache(),
+)
 
     artifact_store = LocalArtifactStore(
         tmp_path / "artifacts"

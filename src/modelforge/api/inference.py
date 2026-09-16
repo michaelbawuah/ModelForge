@@ -13,6 +13,14 @@ from modelforge.schemas.inference import (
 from modelforge.services.deployment_targets import (
     DeploymentTargetNotFoundError,
 )
+from modelforge.services.external_runtime_registry import (
+    ExternalRuntimeRegistry,
+)
+from modelforge.services.external_runtimes import (
+    ExternalRuntimePredictionError,
+    ExternalRuntimeProtocolError,
+    ExternalRuntimeUnavailableError,
+)
 from modelforge.services.inference import (
     ArtifactIntegrityError,
     ArtifactUnavailableError,
@@ -23,15 +31,23 @@ from modelforge.services.model_cache import ModelCache
 from modelforge.services.runtime_bootstrap import (
     create_runtime_registry,
 )
+from modelforge.services.runtime_resolver import RuntimeResolver
 from modelforge.services.runtimes import RuntimeNotFoundError
 
 router = APIRouter(tags=["inference"])
 
 _runtime_registry = create_runtime_registry()
+_external_runtime_registry = ExternalRuntimeRegistry()
+
+_runtime_resolver = RuntimeResolver(
+    runtimes=_runtime_registry,
+    external_runtimes=_external_runtime_registry,
+)
+
 _model_cache = ModelCache()
 
 _inference_service = InferenceService(
-    runtimes=_runtime_registry,
+    resolver=_runtime_resolver,
     cache=_model_cache,
 )
 
@@ -40,6 +56,12 @@ def get_inference_service() -> InferenceService:
     """Return the process-local inference service."""
 
     return _inference_service
+
+
+def get_external_runtime_registry() -> ExternalRuntimeRegistry:
+    """Return the process-local external runtime registry."""
+
+    return _external_runtime_registry
 
 
 @router.post(
@@ -76,12 +98,15 @@ def predict(
         ArtifactIntegrityError,
         RuntimeNotFoundError,
         InferenceConfigurationError,
+        ExternalRuntimeUnavailableError,
+        ExternalRuntimeProtocolError,
+        ExternalRuntimePredictionError,
     ) as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),

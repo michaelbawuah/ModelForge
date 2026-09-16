@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -12,8 +12,10 @@ from modelforge.models.deployment import Deployment, DeploymentState
 from modelforge.models.registry import ModelVersion
 from modelforge.services.artifacts import sha256_file
 from modelforge.services.deployment_targets import get_deployment_target
+from modelforge.services.external_runtimes import ExternalRuntimeClient
 from modelforge.services.model_cache import ModelCache
-from modelforge.services.runtimes import RuntimeRegistry
+from modelforge.services.runtime_resolver import RuntimeResolver
+from modelforge.services.runtimes import ModelRuntime
 
 
 class InferenceConfigurationError(Exception):
@@ -42,15 +44,15 @@ class PredictionResult:
 
 
 class InferenceService:
-    """Resolve, verify, load, cache, and execute deployed models."""
+    """Resolve deployments and execute models through the correct runtime."""
 
     def __init__(
         self,
         *,
-        runtimes: RuntimeRegistry,
+        resolver: RuntimeResolver,
         cache: ModelCache,
     ) -> None:
-        self._runtimes = runtimes
+        self._resolver = resolver
         self._cache = cache
 
     def clear_cache(self) -> None:
@@ -99,8 +101,29 @@ class InferenceService:
                 "Active deployment references a missing model version."
             )
 
+        resolved = self._resolver.resolve(model_version.framework)
+
+        if resolved.mode == "external":
+            runtime = cast(
+                ExternalRuntimeClient,
+                resolved.runtime,
+            )
+
+            prediction = runtime.predict(
+                inputs=inputs,
+                model=self._external_model_metadata(model_version),
+            )
+
+            return self._result(
+                prediction=prediction,
+                target_environment=target.environment,
+                deployment=deployment,
+                model_version=model_version,
+                cache_hit=False,
+            )
+
+        runtime = cast(ModelRuntime, resolved.runtime)
         artifact_path = self._artifact_path(model_version.artifact_uri)
-        runtime = self._runtimes.get(model_version.framework)
 
         loaded_model, cache_hit = self._cache.get_or_load(
             model_version.id,
@@ -116,9 +139,26 @@ class InferenceService:
             inputs,
         )
 
+        return self._result(
+            prediction=prediction,
+            target_environment=target.environment,
+            deployment=deployment,
+            model_version=model_version,
+            cache_hit=cache_hit,
+        )
+
+    @staticmethod
+    def _result(
+        *,
+        prediction: Any,
+        target_environment: str,
+        deployment: Deployment,
+        model_version: ModelVersion,
+        cache_hit: bool,
+    ) -> PredictionResult:
         return PredictionResult(
             prediction=prediction,
-            environment=target.environment,
+            environment=target_environment,
             deployment_id=deployment.id,
             model_version_id=model_version.id,
             model_version=model_version.version,
@@ -127,11 +167,25 @@ class InferenceService:
         )
 
     @staticmethod
+    def _external_model_metadata(
+        model_version: ModelVersion,
+    ) -> dict[str, Any]:
+        """Describe an immutable model version to an external runtime."""
+
+        return {
+            "model_version_id": model_version.id,
+            "version": model_version.version,
+            "framework": model_version.framework,
+            "artifact_uri": model_version.artifact_uri,
+            "checksum": model_version.checksum,
+        }
+
+    @staticmethod
     def _verify_and_load(
         *,
         artifact_path: Path,
         expected_checksum: str,
-        runtime: Any,
+        runtime: ModelRuntime,
     ) -> Any:
         """Verify an immutable artifact once before loading it into memory."""
 

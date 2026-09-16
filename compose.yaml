@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: modelforge-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: modelforge
+      MYSQL_USER: modelforge
+      MYSQL_PASSWORD: modelforge_dev
+      MYSQL_ROOT_PASSWORD: modelforge_root_dev
+    ports:
+      - "3306:3306"
+    volumes:
+      - modelforge_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pmodelforge_root_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  modelforge_mysql_data:

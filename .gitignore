@@ -34,3 +34,5 @@ artifacts/
 # Logs
 *.log
 logs/
+# Local ModelForge artifact storage
+.modelforge/

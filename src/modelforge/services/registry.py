@@ -1,11 +1,15 @@
 """Business logic for the persistent model registry."""
 
+from pathlib import Path
+from typing import BinaryIO
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from modelforge.models.registry import Model, ModelVersion
 from modelforge.schemas.registry import ModelCreate, ModelVersionCreate
+from modelforge.services.artifacts import ArtifactStore
 
 
 class ModelAlreadyExistsError(Exception):
@@ -78,6 +82,64 @@ def create_model_version(
     except IntegrityError as exc:
         session.rollback()
         raise ModelVersionAlreadyExistsError(payload.version) from exc
+
+    session.refresh(model_version)
+    return model_version
+
+
+def create_model_version_from_artifact(
+    session: Session,
+    *,
+    model_id: int,
+    version: str,
+    framework: str,
+    filename: str,
+    source: BinaryIO,
+    artifact_store: ArtifactStore,
+) -> ModelVersion:
+    """Store an artifact and register its immutable model version.
+
+    Artifact storage and the relational database cannot participate in one
+    ACID transaction. If database registration fails after the artifact has
+    been written, ModelForge performs compensating cleanup.
+    """
+
+    model = get_model(session, model_id)
+
+    existing_statement = select(ModelVersion).where(
+        ModelVersion.model_id == model_id,
+        ModelVersion.version == version,
+    )
+
+    if session.scalar(existing_statement) is not None:
+        raise ModelVersionAlreadyExistsError(version)
+
+    artifact = artifact_store.store(
+    source,
+    model_name=model.name,
+    version=version,
+    filename=Path(filename).name,
+)
+
+    model_version = ModelVersion(
+        model_id=model_id,
+        version=version,
+        framework=framework,
+        artifact_uri=artifact.uri,
+        checksum=artifact.checksum,
+    )
+
+    session.add(model_version)
+
+    try:
+        session.commit()
+    except Exception:
+        session.rollback()
+
+        # Compensating transaction: avoid leaving an orphaned artifact when
+        # relational persistence fails.
+        artifact_store.delete(artifact.uri)
+        raise
 
     session.refresh(model_version)
     return model_version

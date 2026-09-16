@@ -75,3 +75,101 @@ def test_model_registry_workflow() -> None:
         and version["framework"] == "fluxion"
         for version in versions
     )
+
+def test_upload_model_artifact(tmp_path) -> None:
+    """An uploaded artifact is stored and registered with derived metadata."""
+
+    from pathlib import Path
+
+    from modelforge.api.app import app
+    from modelforge.api.registry import get_artifact_store
+    from modelforge.services.artifacts import LocalArtifactStore
+
+    model_name = "artifact-integration-test"
+
+    create_response = client.post(
+        "/models",
+        json={
+            "name": model_name,
+            "description": "Artifact upload integration test.",
+        },
+    )
+
+    if create_response.status_code == 409:
+        models_response = client.get("/models")
+        model = next(
+            item
+            for item in models_response.json()
+            if item["name"] == model_name
+        )
+    else:
+        assert create_response.status_code == 201
+        model = create_response.json()
+
+    model_id = model["id"]
+    store = LocalArtifactStore(tmp_path / "artifacts")
+
+    app.dependency_overrides[get_artifact_store] = lambda: store
+
+    try:
+        response = client.post(
+            f"/models/{model_id}/artifacts",
+            data={
+                "version": "artifact-test-v1",
+                "framework": "fluxion",
+            },
+            files={
+                "artifact": (
+                    "model.bin",
+                    b"real-model-artifact-bytes",
+                    "application/octet-stream",
+                )
+            },
+        )
+
+        assert response.status_code in {201, 409}
+
+        if response.status_code == 201:
+            registered = response.json()
+
+            artifact_path = Path(registered["artifact_uri"])
+
+            assert artifact_path.exists()
+            assert artifact_path.read_bytes() == b"real-model-artifact-bytes"
+            assert registered["framework"] == "fluxion"
+            assert registered["checksum"]
+            assert registered["status"] == "REGISTERED"
+    finally:
+        app.dependency_overrides.pop(get_artifact_store, None)
+
+
+def test_upload_artifact_for_missing_model(tmp_path) -> None:
+    """Uploading to an unknown model fails without writing an artifact."""
+
+    from modelforge.api.app import app
+    from modelforge.api.registry import get_artifact_store
+    from modelforge.services.artifacts import LocalArtifactStore
+
+    store = LocalArtifactStore(tmp_path / "artifacts")
+    app.dependency_overrides[get_artifact_store] = lambda: store
+
+    try:
+        response = client.post(
+            "/models/999999999/artifacts",
+            data={
+                "version": "1.0.0",
+                "framework": "fluxion",
+            },
+            files={
+                "artifact": (
+                    "model.bin",
+                    b"should-not-be-stored",
+                    "application/octet-stream",
+                )
+            },
+        )
+
+        assert response.status_code == 404
+        assert not (tmp_path / "artifacts").exists()
+    finally:
+        app.dependency_overrides.pop(get_artifact_store, None)

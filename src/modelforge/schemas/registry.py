@@ -24,12 +24,19 @@ class ModelRead(BaseModel):
 
 
 class ModelVersionCreate(BaseModel):
-    """Payload used to register a new immutable model version."""
+    """Metadata used to register an existing immutable model artifact."""
 
     version: str = Field(min_length=1, max_length=64)
     framework: str = Field(min_length=1, max_length=64)
     artifact_uri: str = Field(min_length=1, max_length=2048)
     checksum: str = Field(min_length=1, max_length=128)
+
+
+class ModelArtifactCreate(BaseModel):
+    """Metadata accompanying an artifact uploaded to ModelForge."""
+
+    version: str = Field(min_length=1, max_length=64)
+    framework: str = Field(min_length=1, max_length=64)
 
 
 class ModelVersionRead(BaseModel):

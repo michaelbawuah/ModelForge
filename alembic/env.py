@@ -2,12 +2,12 @@
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import modelforge.models  # noqa: F401
+from alembic import context
 from modelforge.db.base import Base
 from modelforge.db.session import DATABASE_URL
-import modelforge.models  # noqa: F401
 
 config = context.config
 

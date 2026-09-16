@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 
 from modelforge.api.app import app
 
-
 client = TestClient(app)
 
 

@@ -14,6 +14,7 @@ dependencies = [
     "pymysql>=1.1",
     "alembic>=1.13",
     "python-multipart>=0.0.9",
+    "prometheus-client>=0.22,<1",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +32,7 @@ onnx = [
     "onnx>=1.16",
     "onnxruntime>=1.18",
 ]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

@@ -78,3 +78,14 @@ def test_frameworks_returns_deterministic_registered_names() -> None:
         "onnx",
         "pytorch",
     )
+def test_runtime_must_implement_required_contract() -> None:
+    registry = RuntimeRegistry()
+
+    with pytest.raises(
+        TypeError,
+        match=r"load\(\).*predict\(\)",
+    ):
+        registry.register(
+            "broken",
+            object(),
+        )

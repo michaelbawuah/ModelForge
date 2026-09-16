@@ -19,22 +19,15 @@ from modelforge.services.inference import (
     InferenceConfigurationError,
     InferenceService,
 )
-from modelforge.services.json_runtime import JsonModelRuntime
 from modelforge.services.model_cache import ModelCache
-from modelforge.services.onnx_runtime import OnnxRuntime
-from modelforge.services.pytorch_runtime import PyTorchRuntime
-from modelforge.services.runtimes import (
-    RuntimeNotFoundError,
-    RuntimeRegistry,
+from modelforge.services.runtime_bootstrap import (
+    create_runtime_registry,
 )
+from modelforge.services.runtimes import RuntimeNotFoundError
 
 router = APIRouter(tags=["inference"])
 
-_runtime_registry = RuntimeRegistry()
-_runtime_registry.register("modelforge-json", JsonModelRuntime())
-_runtime_registry.register("onnx", OnnxRuntime())
-_runtime_registry.register("pytorch", PyTorchRuntime())
-
+_runtime_registry = create_runtime_registry()
 _model_cache = ModelCache()
 
 _inference_service = InferenceService(

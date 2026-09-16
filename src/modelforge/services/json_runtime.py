@@ -27,10 +27,10 @@ class JsonModelRuntime:
         bias = model.get("bias")
 
         if not isinstance(weight, (int, float)):
-            raise ValueError("JSON model weight must be numeric.")
+            raise TypeError("JSON model weight must be numeric.")
 
         if not isinstance(bias, (int, float)):
-            raise ValueError("JSON model bias must be numeric.")
+            raise TypeError("JSON model bias must be numeric.")
 
         return model
 

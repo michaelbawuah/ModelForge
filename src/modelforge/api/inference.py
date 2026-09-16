@@ -21,6 +21,7 @@ from modelforge.services.inference import (
 )
 from modelforge.services.json_runtime import JsonModelRuntime
 from modelforge.services.model_cache import ModelCache
+from modelforge.services.onnx_runtime import OnnxRuntime
 from modelforge.services.pytorch_runtime import PyTorchRuntime
 from modelforge.services.runtimes import (
     RuntimeNotFoundError,
@@ -29,10 +30,9 @@ from modelforge.services.runtimes import (
 
 router = APIRouter(tags=["inference"])
 
-DatabaseSession = Annotated[Session, Depends(get_db)]
-
 _runtime_registry = RuntimeRegistry()
 _runtime_registry.register("modelforge-json", JsonModelRuntime())
+_runtime_registry.register("onnx", OnnxRuntime())
 _runtime_registry.register("pytorch", PyTorchRuntime())
 
 _model_cache = ModelCache()
@@ -49,53 +49,41 @@ def get_inference_service() -> InferenceService:
     return _inference_service
 
 
-InferenceServiceDependency = Annotated[
-    InferenceService,
-    Depends(get_inference_service),
-]
-
-
 @router.post(
     "/predict",
     response_model=PredictionResponse,
+    status_code=status.HTTP_200_OK,
 )
 def predict(
-    payload: PredictionRequest,
-    session: DatabaseSession,
-    service: InferenceServiceDependency,
+    request: PredictionRequest,
+    session: Annotated[Session, Depends(get_db)],
+    service: Annotated[
+        InferenceService,
+        Depends(get_inference_service),
+    ],
 ) -> PredictionResponse:
-    """Run inference using an environment's authoritative deployment."""
+    """Serve a prediction from an environment's active deployment."""
 
     try:
         result = service.predict(
             session,
-            environment=payload.environment,
-            inputs=payload.inputs,
+            environment=request.environment,
+            inputs=request.inputs,
         )
     except DeploymentTargetNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=(
-                f"Environment '{payload.environment}' "
-                "has no active deployment."
+                f"No active deployment exists for environment "
+                f"'{request.environment}'."
             ),
         ) from exc
-    except ArtifactUnavailableError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    except ArtifactIntegrityError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    except RuntimeNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    except InferenceConfigurationError as exc:
+    except (
+        ArtifactUnavailableError,
+        ArtifactIntegrityError,
+        RuntimeNotFoundError,
+        InferenceConfigurationError,
+    ) as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),

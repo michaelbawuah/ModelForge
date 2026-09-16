@@ -7,9 +7,12 @@ import json
 import uuid
 from pathlib import Path
 
+import numpy as np
+import onnx
 import pytest
 import torch
 from fastapi.testclient import TestClient
+from onnx import TensorProto, helper, numpy_helper
 
 from modelforge.api.app import app
 from modelforge.api.inference import get_inference_service
@@ -397,6 +400,183 @@ def test_pytorch_model_serves_through_full_deployment_lifecycle(
     second_payload = second_prediction.json()
 
     assert second_payload["prediction"] == pytest.approx(9.0)
+    assert second_payload["model_version_id"] == model_version["id"]
+    assert second_payload["cache_hit"] is True
+
+    service.clear_cache()
+    app.dependency_overrides.clear()
+
+
+def _write_linear_onnx_model(path) -> None:
+    """Create a real ONNX model implementing y = xW + b."""
+
+    input_info = helper.make_tensor_value_info(
+        "input",
+        TensorProto.FLOAT,
+        [None, 2],
+    )
+
+    output_info = helper.make_tensor_value_info(
+        "output",
+        TensorProto.FLOAT,
+        [None, 1],
+    )
+
+    weight = numpy_helper.from_array(
+        np.array(
+            [
+                [2.0],
+                [3.0],
+            ],
+            dtype=np.float32,
+        ),
+        name="weight",
+    )
+
+    bias = numpy_helper.from_array(
+        np.array(
+            [1.0],
+            dtype=np.float32,
+        ),
+        name="bias",
+    )
+
+    matmul = helper.make_node(
+        "MatMul",
+        inputs=["input", "weight"],
+        outputs=["weighted"],
+    )
+
+    add = helper.make_node(
+        "Add",
+        inputs=["weighted", "bias"],
+        outputs=["output"],
+    )
+
+    graph = helper.make_graph(
+        [matmul, add],
+        "modelforge-e2e-linear",
+        [input_info],
+        [output_info],
+        initializer=[weight, bias],
+    )
+
+    model = helper.make_model(
+        graph,
+        producer_name="modelforge-e2e-tests",
+        opset_imports=[
+            helper.make_operatorsetid("", 18),
+        ],
+    )
+
+    onnx.checker.check_model(model)
+    onnx.save(model, path)
+
+
+def test_onnx_model_serves_through_full_deployment_lifecycle(
+    tmp_path,
+) -> None:
+    """An ONNX artifact can be uploaded, deployed, cached, and served."""
+
+    environment = _unique_name("onnx-production")
+    model_name = _unique_name("onnx-model")
+
+    artifact_store = LocalArtifactStore(tmp_path / "artifacts")
+    app.dependency_overrides[get_artifact_store] = (
+        lambda: artifact_store
+    )
+
+    artifact_path = tmp_path / "trained-model.onnx"
+    _write_linear_onnx_model(artifact_path)
+
+    create_model_response = client.post(
+        "/models",
+        json={
+            "name": model_name,
+            "description": "End-to-end ONNX inference test model.",
+        },
+    )
+
+    assert create_model_response.status_code == 201
+    model_id = create_model_response.json()["id"]
+
+    with artifact_path.open("rb") as artifact_file:
+        upload_response = client.post(
+            f"/models/{model_id}/artifacts",
+            data={
+                "version": "1.0.0",
+                "framework": "onnx",
+            },
+            files={
+                "artifact": (
+                    "trained-model.onnx",
+                    artifact_file,
+                    "application/octet-stream",
+                )
+            },
+        )
+
+    assert upload_response.status_code == 201
+    model_version = upload_response.json()
+
+    deployment_response = client.post(
+        "/deployments",
+        json={
+            "model_version_id": model_version["id"],
+            "environment": environment,
+        },
+    )
+
+    assert deployment_response.status_code == 201
+    deployment = deployment_response.json()
+
+    promote_response = client.post(
+        f"/deployments/{deployment['id']}/promote"
+    )
+
+    assert promote_response.status_code == 200
+    assert promote_response.json()["state"] == "ACTIVE"
+
+    service = get_inference_service()
+    service.clear_cache()
+
+    first_prediction = client.post(
+        "/predict",
+        json={
+            "environment": environment,
+            "inputs": [[4.0, 5.0]],
+        },
+    )
+
+    assert first_prediction.status_code == 200
+    first_payload = first_prediction.json()
+
+    assert first_payload["prediction"] == 24.0
+    assert first_payload["environment"] == environment
+    assert first_payload["deployment_id"] == deployment["id"]
+    assert first_payload["model_version_id"] == model_version["id"]
+    assert first_payload["model_version"] == "1.0.0"
+    assert first_payload["framework"] == "onnx"
+    assert first_payload["cache_hit"] is False
+
+    second_prediction = client.post(
+        "/predict",
+        json={
+            "environment": environment,
+            "inputs": [
+                [1.0, 2.0],
+                [3.0, 4.0],
+            ],
+        },
+    )
+
+    assert second_prediction.status_code == 200
+    second_payload = second_prediction.json()
+
+    assert second_payload["prediction"] == [
+        [9.0],
+        [19.0],
+    ]
     assert second_payload["model_version_id"] == model_version["id"]
     assert second_payload["cache_hit"] is True
 

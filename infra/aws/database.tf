@@ -36,5 +36,5 @@ resource "aws_db_instance" "modelforge" {
   skip_final_snapshot     = !var.db_deletion_protection
 
   auto_minor_version_upgrade = true
-  apply_immediately           = false
+  apply_immediately          = false
 }

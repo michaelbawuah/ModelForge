@@ -32,7 +32,11 @@ services:
     ports:
       - "8090:8090"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/health"]
+      test:
+        - CMD-SHELL
+        - >-
+          wget -qO- --header="Authorization: Bearer $MODELFORGE_RUNTIME_TOKEN"
+          http://127.0.0.1:8090/health >/dev/null
       interval: 5s
       timeout: 3s
       retries: 10

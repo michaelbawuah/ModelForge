@@ -76,16 +76,18 @@ def test_public_verification_passes_for_hardened_hosted_product() -> None:
 def test_public_verification_rejects_http_when_https_is_required() -> None:
     transport = httpx.MockTransport(_response)
 
-    with httpx.Client(
-        base_url="http://modelforge.example/",
-        transport=transport,
-    ) as client:
-        with pytest.raises(PublicVerificationError, match="HTTPS"):
-            verify_public_deployment(
-                client,
-                require_https=True,
-                require_oidc=True,
-            )
+    with (
+        httpx.Client(
+            base_url="http://modelforge.example/",
+            transport=transport,
+        ) as client,
+        pytest.raises(PublicVerificationError, match="HTTPS"),
+    ):
+        verify_public_deployment(
+            client,
+            require_https=True,
+            require_oidc=True,
+        )
 
 
 def test_public_verification_rejects_unsafe_inline_csp() -> None:
@@ -93,13 +95,15 @@ def test_public_verification_rejects_unsafe_inline_csp() -> None:
         lambda request: _response(request, insecure_csp=True)
     )
 
-    with httpx.Client(
-        base_url="https://modelforge.example/",
-        transport=transport,
-    ) as client:
-        with pytest.raises(PublicVerificationError, match="unsafe inline"):
-            verify_public_deployment(
-                client,
-                require_https=True,
-                require_oidc=True,
-            )
+    with (
+        httpx.Client(
+            base_url="https://modelforge.example/",
+            transport=transport,
+        ) as client,
+        pytest.raises(PublicVerificationError, match="unsafe inline"),
+    ):
+        verify_public_deployment(
+            client,
+            require_https=True,
+            require_oidc=True,
+        )

@@ -1,0 +1,81 @@
+name: Hosted Demo Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "ModelForge serving environment name used for the proof."
+        required: false
+        default: "recruiter-demo"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modelforge-hosted-demo-proof
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      MODELFORGE_URL: ${{ vars.MODELFORGE_PUBLIC_URL }}
+      MODELFORGE_API_KEY: ${{ secrets.MODELFORGE_DEMO_API_KEY }}
+      MODELFORGE_WORKSPACE: ${{ vars.MODELFORGE_DEMO_WORKSPACE }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Validate hosted proof configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          : "${MODELFORGE_URL:?Set MODELFORGE_PUBLIC_URL in the production environment.}"
+          : "${MODELFORGE_API_KEY:?Set MODELFORGE_DEMO_API_KEY in the production environment.}"
+          : "${MODELFORGE_WORKSPACE:?Set MODELFORGE_DEMO_WORKSPACE in the production environment.}"
+
+          if [[ "${MODELFORGE_URL}" != https://* ]]; then
+            echo "MODELFORGE_PUBLIC_URL must use HTTPS." >&2
+            exit 1
+          fi
+
+          if [[ "${MODELFORGE_API_KEY}" != mf_live_* ]]; then
+            echo "MODELFORGE_DEMO_API_KEY does not look like a ModelForge workspace API key." >&2
+            exit 1
+          fi
+
+      - name: Install proof client
+        run: python -m pip install -e .
+
+      - name: Verify hosted service health
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="${MODELFORGE_URL%/}"
+          curl --fail --silent --show-error "${BASE_URL}/health" >/dev/null
+          curl --fail --silent --show-error "${BASE_URL}/ready" >/dev/null
+
+      - name: Run hosted deployment proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python demo/proof_scenario.py             --environment "${{ inputs.environment }}-${GITHUB_RUN_ID}"             --weight 50             --traffic-requests 60             --output-dir hosted-demo-proof             2>&1 | tee hosted-demo-proof.log
+
+      - name: Upload hosted proof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelforge-hosted-demo-proof-${{ github.run_id }}
+          path: |
+            hosted-demo-proof/
+            hosted-demo-proof.log
+          if-no-files-found: ignore
+          retention-days: 30

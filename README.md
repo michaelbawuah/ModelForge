@@ -10,14 +10,14 @@ Rather than treating model serving as a single `/predict` endpoint, ModelForge t
 
 | Signal | Current validated result |
 |---|---|
-| Python test suite | **121 passed**, 3 skipped |
+| Python test suite | **138 passed**, 3 skipped |
 | Go validation | `gofmt`, `go test ./...`, and `go vet ./...` green |
 | CI benchmark | **200 / 200 successful requests**, 0% errors |
 | Throughput | **133.5 requests/s** |
 | End-to-end latency | **p50 137.3 ms · p95 231.2 ms · p99 322.8 ms** |
 | Runtime boundary | Python control plane + standalone Go inference service |
 | Release safety | weighted canaries, rollback, circuit breakers, automatic stable fallback |
-| Operator surfaces | REST/OpenAPI, browser dashboard, installable CLI |
+| Product surfaces | public landing page, multi-tenant SaaS console, REST/OpenAPI, authenticated CLI |
 
 > Benchmark values above come from the post-merge GitHub Actions smoke run on a hosted Ubuntu runner. They are reproducible validation evidence, not hardware-independent production performance claims.
 
@@ -35,7 +35,13 @@ Seed a real stable + canary deployment:
 python demo/bootstrap_demo.py --environment demo --weight 20
 ```
 
-Open the operator dashboard:
+Open the public product landing page:
+
+```text
+http://localhost:8000/
+```
+
+Open the ModelForge SaaS console:
 
 ```text
 http://localhost:8000/dashboard
@@ -91,12 +97,15 @@ The seeded demo creates two immutable model versions, promotes version `1.0.0` a
 
 ## Implemented Capabilities
 
-### Operational Dashboard and CLI
+### Public SaaS Console and CLI
 
-ModelForge includes two first-class operator surfaces on top of the same public API.
+ModelForge now includes a public landing page plus a multi-tenant browser console on top of the same API used by automation.
 
-The browser dashboard at `/dashboard` exposes:
+The browser console at `/dashboard` exposes:
 
+- authenticated user identity and workspace selection
+- first-deployment onboarding
+- workspace API-key creation, one-time secret reveal, listing, and revocation
 - API readiness and external-runtime health
 - model and immutable-version inventory
 - deployment state by environment
@@ -105,7 +114,28 @@ The browser dashboard at `/dashboard` exposes:
 - live inference with model-version and traffic-lane metadata
 - promotion, rollback, canary reweight, promotion, and abort actions
 
-The installable `modelforge` CLI exposes the same operational model for terminal workflows, including health inspection, deployment inventory, prediction, rollback, and canary operations.
+Browser authentication uses OIDC Authorization Code + PKCE with nonce binding, opaque server-side sessions, HttpOnly session cookies, double-submit CSRF protection, and a strict Content Security Policy with packaged external CSS/JavaScript assets.
+
+The installable `modelforge` CLI supports workspace API keys and exposes the same operational model for terminal and CI workflows, including health inspection, deployment inventory, prediction, rollback, and canary operations.
+
+### SaaS Tenancy and Access Control
+
+Customer-owned resources are scoped to workspaces. Models, deployments, environment targets, canaries, artifacts, API keys, and inference requests all resolve inside the authenticated workspace boundary.
+
+The SaaS foundation includes:
+
+- users, workspaces, workspace membership, and role hierarchy;
+- vendor-neutral OIDC bearer-token verification;
+- opaque browser sessions with server-side expiry/revocation state;
+- high-entropy `mf_live_...` API keys stored only as one-way hashes;
+- per-workspace artifact namespaces;
+- self-hosted compatibility through `MODELFORGE_AUTH_MODE=disabled`.
+
+### Cloud Artifact Storage
+
+The artifact abstraction supports both local filesystem storage for self-hosting and S3-compatible object storage for hosted deployments.
+
+The cloud backend preserves immutable publication, SHA-256 integrity verification, tenant-separated object keys, and verified local materialization for in-process runtimes. S3-compatible endpoints can be configured without changing registry or inference semantics.
 
 ### Model Registry and Artifact Management
 
@@ -342,7 +372,7 @@ be captured on controlled hardware.
 | p95 latency | 231.2 ms |
 | p99 latency | 322.8 ms |
 
-This run also smoke-tested the installed CLI, bundled dashboard, seeded stable/canary demo, CLI inference, Docker Compose stack, and external Go runtime.
+The latest public-product validation also smoke-tests the installed CLI, public landing page, multi-tenant SaaS console, auth configuration, seeded stable/canary demo, CLI inference, Docker Compose stack, and external Go runtime.
 
 ### Observability and Readiness
 
@@ -375,6 +405,8 @@ make down
 |---|---|
 | API / Control Plane | Python, FastAPI |
 | Database | MySQL |
+| Identity | OIDC Authorization Code + PKCE, opaque browser sessions, workspace API keys |
+| Object Storage | Local filesystem or S3-compatible storage |
 | ORM | SQLAlchemy |
 | Database Migrations | Alembic |
 | ML Execution | PyTorch, ONNX Runtime |
@@ -412,7 +444,7 @@ Reliability and performance characteristics should be demonstrated through tests
 
 ## Testing
 
-The post-merge validation checkpoint currently reports **121 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
+The post-merge validation checkpoint currently reports **138 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
 
 ```text
 Artifact storage
@@ -522,9 +554,10 @@ ModelForge is under active development.
 
 Upcoming engineering milestones include:
 
+- public-cloud deployment and managed production configuration
+- controlled-hardware performance baselines
 - distributed caching and coordination
 - asynchronous inference and worker execution
-- cloud deployment
 - expanded serving observability
 
 ## Why ModelForge?

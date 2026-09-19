@@ -53,6 +53,7 @@ class ArtifactStore(Protocol):
         model_name: str,
         version: str,
         filename: str,
+        namespace: str | None = None,
     ) -> StoredArtifact:
         """Persist an immutable artifact."""
 
@@ -107,13 +108,18 @@ class LocalArtifactStore:
 
         model_name = _validate_component(model_name, "model_name")
         version = _validate_component(version, "version")
+        if namespace is not None:
+            namespace = _validate_component(namespace, "namespace")
 
         # Path.name strips any directory supplied by a client. Validation then
         # rejects suspicious filenames rather than allowing path traversal.
         safe_filename = Path(filename).name
         _validate_component(safe_filename, "filename")
 
-        destination_dir = self.root / model_name / version
+        destination_dir = self.root
+        if namespace is not None:
+            destination_dir = destination_dir / namespace
+        destination_dir = destination_dir / model_name / version
         destination_dir.mkdir(parents=True, exist_ok=True)
 
         destination = destination_dir / safe_filename

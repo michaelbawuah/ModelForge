@@ -7,6 +7,7 @@ from pathlib import Path
 from secrets import randbelow
 from typing import Any, Literal, cast
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from modelforge.models.deployment import Deployment, DeploymentState
@@ -83,10 +84,15 @@ class InferenceService:
         *,
         environment: str,
         inputs: Any,
+        workspace_id: int = 1,
     ) -> PredictionResult:
         """Run inference using weighted stable/canary routing."""
 
-        target = get_deployment_target(session, environment)
+        target = get_deployment_target(
+            session,
+            environment,
+            workspace_id=workspace_id,
+        )
         deployment, lane = self._select_deployment(session, target)
 
         try:
@@ -115,10 +121,16 @@ class InferenceService:
                     "Automatic rollback after canary serving failure: "
                     f"{type(exc).__name__}."
                 ),
+                workspace_id=workspace_id,
             )
             CANARY_AUTOMATIC_ROLLBACKS.labels(target.environment).inc()
 
-            stable = session.get(Deployment, target.active_deployment_id)
+            stable = session.scalar(
+                select(Deployment).where(
+                    Deployment.id == target.active_deployment_id,
+                    Deployment.workspace_id == workspace_id,
+                )
+            )
             if stable is None:
                 raise InferenceConfigurationError(
                     "Stable deployment disappeared during canary fallback."
@@ -161,7 +173,12 @@ class InferenceService:
             lane = "stable"
             expected_state = DeploymentState.ACTIVE
 
-        deployment = session.get(Deployment, deployment_id)
+        deployment = session.scalar(
+            select(Deployment).where(
+                Deployment.id == deployment_id,
+                Deployment.workspace_id == target.workspace_id,
+            )
+        )
         if deployment is None:
             raise InferenceConfigurationError(
                 f"{lane.capitalize()} target references a missing deployment."

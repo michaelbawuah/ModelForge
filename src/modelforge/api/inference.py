@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from modelforge.db.session import get_db
 from modelforge.schemas.inference import PredictionRequest, PredictionResponse
+from modelforge.services.auth import Principal, get_principal
 from modelforge.services.deployment_targets import DeploymentTargetNotFoundError
 from modelforge.services.external_runtime_bootstrap import (
     create_external_runtime_registry,
@@ -64,12 +65,14 @@ def predict(
     request: PredictionRequest,
     session: Annotated[Session, Depends(get_db)],
     service: Annotated[InferenceService, Depends(get_inference_service)],
+    principal: Annotated[Principal, Depends(get_principal)],
 ) -> PredictionResponse:
     try:
         result = service.predict(
             session,
             environment=request.environment,
             inputs=request.inputs,
+            workspace_id=principal.workspace_id,
         )
     except DeploymentTargetNotFoundError as exc:
         raise HTTPException(

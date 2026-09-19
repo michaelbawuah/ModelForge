@@ -10,6 +10,7 @@ class DeploymentTargetRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    workspace_id: int
     environment: str
     active_deployment_id: int
     canary_deployment_id: int | None = None

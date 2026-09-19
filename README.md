@@ -10,7 +10,7 @@ Rather than treating model serving as a single `/predict` endpoint, ModelForge t
 
 | Signal | Current validated result |
 |---|---|
-| Python test suite | **164 passed**, 3 skipped |
+| Python test suite | **168 passed**, 3 skipped |
 | Go validation | `gofmt`, `go test ./...`, and `go vet ./...` green |
 | CI benchmark | **200 / 200 successful requests**, 0% errors |
 | Throughput | **133.5 requests/s** |
@@ -41,6 +41,23 @@ stable deployment, weighted canary traffic, canary promotion, rollback, an
 intentionally regressed canary, automated abort, and final stable-target
 verification. It writes JSON/JSONL/Markdown evidence to
 `demo-proof-evidence/` and exits non-zero if any lifecycle assertion fails.
+
+For a real public deployment, ModelForge also includes a non-mutating hosted
+release gate:
+
+```bash
+MODELFORGE_URL=https://YOUR_PUBLIC_HOST \
+MODELFORGE_API_KEY=mf_live_... \
+MODELFORGE_WORKSPACE=YOUR_WORKSPACE_SLUG \
+make hosted-verify
+```
+
+It verifies HTTPS/HSTS/CSP, OIDC mode, unauthenticated access controls,
+workspace API-key identity, readiness, runtime inventory, and external-runtime
+health before the hosted lifecycle proof runs. See
+[`docs/hosted-demo.md`](docs/hosted-demo.md). A successful public hosted run
+is intentionally **not claimed** until the `Hosted Demo Proof` workflow passes
+against the real deployment.
 
 For the smaller interactive stable + canary seed:
 
@@ -472,7 +489,7 @@ Reliability and performance characteristics should be demonstrated through tests
 
 ## Testing
 
-The post-merge validation checkpoint currently reports **164 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
+The post-merge validation checkpoint currently reports **168 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
 
 ```text
 Artifact storage

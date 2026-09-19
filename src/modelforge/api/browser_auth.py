@@ -6,10 +6,19 @@ import base64
 import hashlib
 import os
 from datetime import timedelta
+from typing import Annotated
 from urllib.parse import urlencode, urlsplit
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -24,15 +33,17 @@ from modelforge.services.auth import (
 )
 from modelforge.services.identity import (
     LoginChallengeError,
+    consume_login_challenge,
     create_browser_session,
     create_login_challenge,
     ensure_personal_workspace,
     revoke_browser_session,
     upsert_user,
-    consume_login_challenge,
 )
 
 router = APIRouter(prefix="/auth", tags=["browser-auth"])
+DatabaseSession = Annotated[Session, Depends(get_db)]
+CurrentPrincipal = Annotated[Principal, Depends(get_principal)]
 
 DEFAULT_NEXT_PATH = "/dashboard"
 
@@ -94,7 +105,7 @@ def browser_auth_config() -> dict[str, object]:
 
 @router.get("/login", response_class=RedirectResponse)
 def browser_login(
-    session: Session = Depends(get_db),
+    session: DatabaseSession,
     next_path: str | None = Query(default=None, alias="next"),
 ) -> RedirectResponse:
     """Begin OIDC Authorization Code + PKCE login."""
@@ -140,8 +151,8 @@ def browser_login(
 @router.get("/callback", response_class=RedirectResponse)
 def browser_callback(
     code: str,
+    session: DatabaseSession,
     state_value: str = Query(alias="state"),
-    session: Session = Depends(get_db),
 ) -> RedirectResponse:
     """Exchange the authorization code, establish user identity, and set cookies."""
 
@@ -260,8 +271,8 @@ def browser_callback(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def browser_logout(
     request: Request,
-    principal: Principal = Depends(get_principal),
-    session: Session = Depends(get_db),
+    principal: CurrentPrincipal,
+    session: DatabaseSession,
 ) -> Response:
     """Revoke the current browser session and clear session cookies."""
 

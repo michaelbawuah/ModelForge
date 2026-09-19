@@ -70,3 +70,25 @@ The proof deliberately includes both a successful and unsuccessful release:
 
 This gives a reviewer concrete evidence for canary routing, promotion, rollback,
 failure recording, and stable-target preservation in one reproducible run.
+
+
+## Hosted GitHub proof
+
+The repository also includes a manual `Hosted Demo Proof` workflow. It runs
+the same proof against the public production service and uploads the evidence
+bundle as a GitHub Actions artifact.
+
+Configure these values on the protected GitHub `production` environment:
+
+- variable `MODELFORGE_PUBLIC_URL` — the HTTPS ModelForge origin;
+- variable `MODELFORGE_DEMO_WORKSPACE` — a workspace slug reserved for demo
+  evidence;
+- secret `MODELFORGE_DEMO_API_KEY` — a workspace API key with at least the
+  `developer` role.
+
+Then dispatch `Hosted Demo Proof` from the `main` branch.
+
+The workflow validates HTTPS, checks `/health` and `/ready`, runs the full
+promotion/rollback/regression-abort scenario, and retains the generated proof
+bundle for 30 days. The API key is injected only as an environment secret and
+is never written to the uploaded evidence.

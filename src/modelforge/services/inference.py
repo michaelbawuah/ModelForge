@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from secrets import randbelow
 from typing import Any, Literal, cast
 
@@ -13,7 +12,12 @@ from sqlalchemy.orm import Session
 from modelforge.models.deployment import Deployment, DeploymentState
 from modelforge.models.deployment_target import DeploymentTarget
 from modelforge.models.registry import ModelVersion
-from modelforge.services.artifacts import sha256_file
+from modelforge.services.artifact_factory import create_artifact_store
+from modelforge.services.artifacts import (
+    ArtifactIntegrityError as StorageArtifactIntegrityError,
+    ArtifactNotFoundError,
+    ArtifactStore,
+)
 from modelforge.services.canaries import abort_canary
 from modelforge.services.deployment_targets import get_deployment_target
 from modelforge.services.external_runtimes import (
@@ -69,9 +73,11 @@ class InferenceService:
         *,
         resolver: RuntimeResolver,
         cache: ModelCache,
+        artifact_store: ArtifactStore | None = None,
     ) -> None:
         self._resolver = resolver
         self._cache = cache
+        self._artifact_store = artifact_store or create_artifact_store()
 
     def clear_cache(self) -> None:
         """Evict all process-local loaded models."""
@@ -234,12 +240,10 @@ class InferenceService:
             )
 
         runtime = cast(ModelRuntime, resolved.runtime)
-        artifact_path = self._artifact_path(model_version.artifact_uri)
-
         loaded_model, cache_hit = self._cache.get_or_load(
             model_version.id,
-            lambda: self._verify_and_load(
-                artifact_path=artifact_path,
+            lambda: self._materialize_and_load(
+                artifact_uri=model_version.artifact_uri,
                 expected_checksum=model_version.checksum,
                 runtime=runtime,
             ),
@@ -292,29 +296,21 @@ class InferenceService:
             "checksum": model_version.checksum,
         }
 
-    @staticmethod
-    def _verify_and_load(
+    def _materialize_and_load(
+        self,
         *,
-        artifact_path: Path,
+        artifact_uri: str,
         expected_checksum: str,
         runtime: ModelRuntime,
     ) -> Any:
-        if not artifact_path.is_file():
-            raise ArtifactUnavailableError(
-                f"Artifact does not exist: {artifact_path}"
+        try:
+            artifact_path = self._artifact_store.materialize(
+                artifact_uri,
+                expected_checksum,
             )
-
-        actual_checksum = sha256_file(artifact_path)
-        if actual_checksum != expected_checksum:
-            raise ArtifactIntegrityError(
-                "Artifact checksum does not match the registered model version."
-            )
+        except ArtifactNotFoundError as exc:
+            raise ArtifactUnavailableError(str(exc)) from exc
+        except StorageArtifactIntegrityError as exc:
+            raise ArtifactIntegrityError(str(exc)) from exc
 
         return runtime.load(artifact_path)
-
-    @staticmethod
-    def _artifact_path(artifact_uri: str) -> Path:
-        prefix = "file://"
-        if artifact_uri.startswith(prefix):
-            return Path(artifact_uri[len(prefix):])
-        return Path(artifact_uri)

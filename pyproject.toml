@@ -36,6 +36,9 @@ onnx = [
     "onnx>=1.16",
     "onnxruntime>=1.18",
 ]
+cloud = [
+    "boto3>=1.35",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

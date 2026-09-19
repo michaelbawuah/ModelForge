@@ -13,7 +13,8 @@ from modelforge.schemas.registry import (
     ModelVersionCreate,
     ModelVersionRead,
 )
-from modelforge.services.artifacts import ArtifactAlreadyExistsError, ArtifactStore, LocalArtifactStore
+from modelforge.services.artifact_factory import create_artifact_store
+from modelforge.services.artifacts import ArtifactAlreadyExistsError, ArtifactStore
 from modelforge.services.auth import Principal, get_principal, require_role
 from modelforge.services.registry import (
     ModelAlreadyExistsError,
@@ -33,7 +34,7 @@ CurrentPrincipal = Annotated[Principal, Depends(get_principal)]
 
 
 def get_artifact_store() -> ArtifactStore:
-    return LocalArtifactStore()
+    return create_artifact_store()
 
 
 ArtifactStorage = Annotated[ArtifactStore, Depends(get_artifact_store)]

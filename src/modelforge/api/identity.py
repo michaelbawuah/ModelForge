@@ -135,8 +135,10 @@ def create_workspace_api_key(
             detail=str(exc),
         ) from exc
 
-    return ApiKeyCreatedRead.model_validate(api_key).model_copy(
-        update={"secret": secret}
+    metadata = ApiKeyRead.model_validate(api_key)
+    return ApiKeyCreatedRead(
+        **metadata.model_dump(),
+        secret=secret,
     )
 
 

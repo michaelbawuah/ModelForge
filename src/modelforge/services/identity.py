@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import re
 from datetime import UTC, datetime
 from secrets import token_urlsafe
@@ -276,7 +277,7 @@ def authenticate_api_key(session: Session, raw_key: str) -> ApiKey:
     if (
         api_key is None
         or api_key.revoked_at is not None
-        or not hashlib.compare_digest(api_key.key_hash, _hash_api_key(raw_key))
+        or not hmac.compare_digest(api_key.key_hash, _hash_api_key(raw_key))
     ):
         raise ApiKeyAuthenticationError("Invalid ModelForge API key.")
 

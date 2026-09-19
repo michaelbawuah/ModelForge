@@ -2,11 +2,6 @@ name: Release AWS
 
 on:
   workflow_dispatch:
-    inputs:
-      image_tag:
-        description: Optional immutable image tag. Defaults to the selected main commit SHA.
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -58,7 +53,7 @@ jobs:
           role-session-name: modelforge-${{ github.run_id }}
 
       - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@v2.1.7
 
       - name: Resolve release names
         id: release
@@ -74,14 +69,7 @@ jobs:
           API_REPOSITORY="${MODELFORGE_API_ECR_REPOSITORY:-${NAME}-api}"
           RUNTIME_REPOSITORY="${MODELFORGE_RUNTIME_ECR_REPOSITORY:-${NAME}-go-runtime}"
 
-          TAG="${{ inputs.image_tag }}"
-          if [[ -z "${TAG}" ]]; then
-            TAG="${GITHUB_SHA}"
-          fi
-          if [[ ! "${TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
-            echo "Invalid ECR image tag: ${TAG}" >&2
-            exit 1
-          fi
+          TAG="${GITHUB_SHA}"
 
           API_REPO_URI="$(aws ecr describe-repositories             --repository-names "${API_REPOSITORY}"             --query 'repositories[0].repositoryUri'             --output text)"
           RUNTIME_REPO_URI="$(aws ecr describe-repositories             --repository-names "${RUNTIME_REPOSITORY}"             --query 'repositories[0].repositoryUri'             --output text)"
@@ -92,6 +80,8 @@ jobs:
             echo "cluster=${CLUSTER}"
             echo "api_service=${API_SERVICE}"
             echo "runtime_service=${RUNTIME_SERVICE}"
+            echo "api_repository=${API_REPOSITORY}"
+            echo "runtime_repository=${RUNTIME_REPOSITORY}"
             echo "api_family=${NAME}-${ENVIRONMENT}-api"
             echo "runtime_family=${NAME}-${ENVIRONMENT}-go-runtime"
             echo "migration_family=${NAME}-${ENVIRONMENT}-migration"
@@ -134,15 +124,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker build             --platform linux/amd64             --tag "${{ steps.release.outputs.api_image }}"             .
-          docker push "${{ steps.release.outputs.api_image }}"
+
+          if aws ecr describe-images             --repository-name "${{ steps.release.outputs.api_repository }}"             --image-ids "imageTag=${{ steps.release.outputs.tag }}"             >/dev/null 2>&1; then
+            echo "API image already exists for this commit; reusing immutable tag."
+          else
+            docker build               --platform linux/amd64               --tag "${{ steps.release.outputs.api_image }}"               .
+            docker push "${{ steps.release.outputs.api_image }}"
+          fi
 
       - name: Build and push immutable Go runtime image
         shell: bash
         run: |
           set -euo pipefail
-          docker build             --platform linux/amd64             --tag "${{ steps.release.outputs.runtime_image }}"             runtimes/go-runtime
-          docker push "${{ steps.release.outputs.runtime_image }}"
+
+          if aws ecr describe-images             --repository-name "${{ steps.release.outputs.runtime_repository }}"             --image-ids "imageTag=${{ steps.release.outputs.tag }}"             >/dev/null 2>&1; then
+            echo "Runtime image already exists for this commit; reusing immutable tag."
+          else
+            docker build               --platform linux/amd64               --tag "${{ steps.release.outputs.runtime_image }}"               runtimes/go-runtime
+            docker push "${{ steps.release.outputs.runtime_image }}"
+          fi
 
       - name: Register release task definitions
         id: taskdefs
@@ -198,8 +198,23 @@ jobs:
           API_SERVICE="${{ steps.release.outputs.api_service }}"
           RUNTIME_SERVICE="${{ steps.release.outputs.runtime_service }}"
 
-          API_TASK="$(aws ecs describe-services             --cluster "${CLUSTER}"             --services "${API_SERVICE}"             --query 'services[0].taskDefinition'             --output text)"
-          RUNTIME_TASK="$(aws ecs describe-services             --cluster "${CLUSTER}"             --services "${RUNTIME_SERVICE}"             --query 'services[0].taskDefinition'             --output text)"
+          API_DESCRIPTION="$(aws ecs describe-services --cluster "${CLUSTER}" --services "${API_SERVICE}" --output json)"
+          RUNTIME_DESCRIPTION="$(aws ecs describe-services --cluster "${CLUSTER}" --services "${RUNTIME_SERVICE}" --output json)"
+
+          API_TASK="$(jq -r '.services[0].taskDefinition // empty' <<<"${API_DESCRIPTION}")"
+          RUNTIME_TASK="$(jq -r '.services[0].taskDefinition // empty' <<<"${RUNTIME_DESCRIPTION}")"
+          API_DESIRED="$(jq -r '.services[0].desiredCount // 0' <<<"${API_DESCRIPTION}")"
+          RUNTIME_DESIRED="$(jq -r '.services[0].desiredCount // 0' <<<"${RUNTIME_DESCRIPTION}")"
+
+          if [[ -z "${API_TASK}" || -z "${RUNTIME_TASK}" ]]; then
+            echo "ModelForge ECS services were not found in cluster ${CLUSTER}." >&2
+            exit 1
+          fi
+
+          if (( API_DESIRED < 1 || RUNTIME_DESIRED < 1 )); then
+            echo "ECS services are inactive. Apply Terraform with activate_services=true before automated releases." >&2
+            exit 1
+          fi
 
           aws ecs describe-services             --cluster "${CLUSTER}"             --services "${API_SERVICE}"             --query 'services[0].networkConfiguration.awsvpcConfiguration'             --output json             | jq '{awsvpcConfiguration: .}' > migration-network.json
 

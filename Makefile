@@ -29,7 +29,7 @@ proof:
 	python demo/proof_scenario.py --environment recruiter-demo --output-dir demo-proof-evidence
 
 hosted-verify:
-	python scripts/verify_hosted.py
+	python -m modelforge.hosted_verify
 
 benchmark:
 	python benchmarks/bootstrap_external.py --environment benchmark-go

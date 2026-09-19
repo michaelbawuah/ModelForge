@@ -1,7 +1,6 @@
 """Tests for the seeded demo contract."""
 
 import json
-from pathlib import Path
 
 from demo.bootstrap_demo import MODEL_DIR
 

@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/verify_hosted.py \
+          python -m modelforge.hosted_verify \
             --output hosted-release-evidence.json
 
       - name: Run hosted deployment proof

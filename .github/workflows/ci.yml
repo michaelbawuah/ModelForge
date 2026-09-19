@@ -95,13 +95,31 @@ jobs:
         run: docker compose up --build --wait --detach
       - name: Smoke test installed CLI
         run: modelforge status > cli-status.json
-      - name: Smoke test bundled dashboard
-        run: >-
-          python -c 'import httpx;
-          r=httpx.get("http://127.0.0.1:8000/dashboard", timeout=10);
-          r.raise_for_status();
-          assert "ModelForge Control Plane" in r.text;
-          open("dashboard-smoke.html","w",encoding="utf-8").write(r.text)'
+      - name: Smoke test public product
+        run: |
+          python - <<'PY'
+          import json
+          import httpx
+
+          landing = httpx.get("http://127.0.0.1:8000/", timeout=10)
+          landing.raise_for_status()
+          assert "Deploy any model." in landing.text
+          open("landing-smoke.html", "w", encoding="utf-8").write(landing.text)
+
+          dashboard = httpx.get("http://127.0.0.1:8000/dashboard", timeout=10)
+          dashboard.raise_for_status()
+          assert "Production overview" in dashboard.text
+          assert "API keys" in dashboard.text
+          open("dashboard-smoke.html", "w", encoding="utf-8").write(dashboard.text)
+
+          auth = httpx.get("http://127.0.0.1:8000/auth/config", timeout=10)
+          auth.raise_for_status()
+          payload = auth.json()
+          assert payload["mode"] == "disabled"
+          open("auth-config.json", "w", encoding="utf-8").write(
+              json.dumps(payload, indent=2)
+          )
+          PY
       - name: Seed stable and canary product demo
         run: >-
           python demo/bootstrap_demo.py
@@ -140,7 +158,9 @@ jobs:
             cli-deployments.json
             cli-prediction.json
             demo-bootstrap.json
+            landing-smoke.html
             dashboard-smoke.html
+            auth-config.json
             compose.log
           if-no-files-found: ignore
       - name: Stop ModelForge stack

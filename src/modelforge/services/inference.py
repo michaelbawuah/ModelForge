@@ -14,9 +14,9 @@ from modelforge.models.deployment_target import DeploymentTarget
 from modelforge.models.registry import ModelVersion
 from modelforge.services.artifact_factory import create_artifact_store
 from modelforge.services.artifacts import (
+    ArtifactStore,
     ArtifactIntegrityError as StorageArtifactIntegrityError,
     ArtifactNotFoundError,
-    ArtifactStore,
 )
 from modelforge.services.canaries import abort_canary
 from modelforge.services.deployment_targets import get_deployment_target

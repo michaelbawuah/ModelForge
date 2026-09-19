@@ -29,7 +29,19 @@ Start the full stack:
 docker compose up --build --wait --detach
 ```
 
-Seed a real stable + canary deployment:
+Run the full deployment proof:
+
+```bash
+make proof
+```
+
+The proof creates three immutable versions and exercises the actual serving path:
+stable deployment, weighted canary traffic, canary promotion, rollback, an
+intentionally regressed canary, automated abort, and final stable-target
+verification. It writes JSON/JSONL/Markdown evidence to
+`demo-proof-evidence/` and exits non-zero if any lifecycle assertion fails.
+
+For the smaller interactive stable + canary seed:
 
 ```bash
 python demo/bootstrap_demo.py --environment demo --weight 20
@@ -56,7 +68,11 @@ modelforge runtimes
 modelforge predict demo 10
 ```
 
-The seeded demo creates two immutable model versions, promotes version `1.0.0` as stable, and sends 20% of traffic to version `2.0.0` as a canary. Both the dashboard and CLI operate through the public ModelForge API rather than bypassing deployment state internally.
+The full proof goes further: it proves both canary lanes serve real requests,
+promotes version `2.0.0`, rolls back to version `1.0.0`, then detects a large
+output regression in version `3.0.0` and aborts that canary while preserving
+the stable target. Both the dashboard and CLI operate through the public
+ModelForge API rather than bypassing deployment state internally.
 
 ## Architecture
 
@@ -388,6 +404,7 @@ This creates the foundation for measuring reliability and performance rather tha
 - [External runtime contract](docs/runtime-protocol.md)
 - [Public-cloud deployment contract](docs/cloud-deployment.md)
 - [AWS ECS/Fargate reference deployment](infra/aws/README.md)
+- [Recruiter deployment proof](docs/demo-proof.md)
 - [Recruiter and interview brief](docs/recruiting.md)
 
 Common workflows are available through the root `Makefile`:
@@ -397,6 +414,7 @@ make install
 make check
 make up
 make demo
+make proof
 make benchmark
 make down
 ```

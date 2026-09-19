@@ -23,7 +23,7 @@ const (
 	runtimeAddressEnvName = "MODELFORGE_GO_RUNTIME_ADDR"
 	failEveryEnvName      = "MODELFORGE_GO_RUNTIME_FAIL_EVERY"
 	delayMillisecondsEnv  = "MODELFORGE_GO_RUNTIME_DELAY_MS"
-	runtimeTokenEnvName    = "MODELFORGE_RUNTIME_TOKEN"
+	runtimeTokenEnvName   = "MODELFORGE_RUNTIME_TOKEN"
 )
 
 func main() {

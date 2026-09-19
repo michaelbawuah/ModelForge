@@ -138,8 +138,6 @@ func TestInjectedFailureIsDeterministic(t *testing.T) {
 	}
 }
 
-
-
 func TestRuntimeAuthRejectsMissingBearerToken(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	runtimeServer := NewWithOptions(

@@ -236,8 +236,8 @@ The workflow is manual, runs only from `main`, targets the GitHub
 `production` environment, and uses GitHub's OIDC token to assume an AWS role.
 It then:
 
-1. builds immutable API and Go-runtime images;
-2. pushes both images to ECR;
+1. uses the exact `main` commit SHA as the immutable image tag;
+2. builds and pushes API and Go-runtime images when that SHA is not already in ECR;
 3. registers new API/runtime/migration task-definition revisions;
 4. runs the migration task and requires exit code 0;
 5. deploys the runtime and waits for ECS stability;
@@ -245,6 +245,12 @@ It then:
 7. verifies public `/health` and `/ready`;
 8. rolls services back to their previous task definitions if deployment or
    verification fails.
+
+A release can be rerun safely after a transient failure: ECR repositories are
+immutable, and the workflow reuses images already published for the same commit
+SHA instead of attempting to overwrite them. Automated releases also fail
+closed when the API/runtime ECS services still have desired count zero; perform
+the documented initial `activate_services=true` Terraform apply first.
 
 ### AWS OIDC trust
 

@@ -2,26 +2,31 @@
 
 from datetime import datetime
 
-from sqlalchemy import (
-    DateTime,
-    ForeignKey,
-    String,
-    Text,
-    UniqueConstraint,
-    func,
-)
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from modelforge.db.base import Base
 
 
 class Model(Base):
-    """A logical machine-learning model tracked by ModelForge."""
+    """A logical machine-learning model tracked inside one workspace."""
 
     __tablename__ = "models"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "name",
+            name="uq_models_workspace_name",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(255), index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -48,13 +53,11 @@ class ModelVersion(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-
     model_id: Mapped[int] = mapped_column(
         ForeignKey("models.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     framework: Mapped[str] = mapped_column(String(64), nullable=False)
     artifact_uri: Mapped[str] = mapped_column(String(2048), nullable=False)
@@ -65,11 +68,10 @@ class ModelVersion(Base):
         default="REGISTERED",
         server_default="REGISTERED",
     )
-
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
         nullable=False,
     )
 
-    model: Mapped["Model"] = relationship(back_populates="versions")
+    model: Mapped[Model] = relationship(back_populates="versions")

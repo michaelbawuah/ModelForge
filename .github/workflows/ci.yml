@@ -7,6 +7,11 @@ on:
       - "bulk/**"
   pull_request:
 
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -35,7 +40,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install Python package
-        run: python -m pip install -e ".[dev,pytorch,onnx]"
+        run: python -m pip install -e ".[dev,pytorch,onnx,cloud]"
       - name: Apply database migrations
         run: alembic upgrade head
       - name: Lint

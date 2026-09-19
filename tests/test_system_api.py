@@ -33,3 +33,16 @@ def test_metrics_endpoint_exposes_prometheus_data() -> None:
     assert "modelforge_external_runtime_requests_total" in response.text
     assert "modelforge_external_runtime_retries_total" in response.text
     assert "modelforge_external_runtime_circuit_open_total" in response.text
+
+
+def test_metrics_can_be_protected_with_bearer_token(monkeypatch) -> None:
+    monkeypatch.setenv("MODELFORGE_METRICS_TOKEN", "metrics-secret")
+
+    unauthorized = client.get("/metrics")
+    assert unauthorized.status_code == 401
+
+    authorized = client.get(
+        "/metrics",
+        headers={"Authorization": "Bearer metrics-secret"},
+    )
+    assert authorized.status_code == 200

@@ -8,9 +8,18 @@ from modelforge.cli import build_parser, main
 
 
 class FakeAPI:
-    def __init__(self, base_url: str, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        timeout_seconds: float,
+        *,
+        api_key: str | None = None,
+        workspace: str | None = None,
+    ) -> None:
         self.base_url = base_url
         self.timeout_seconds = timeout_seconds
+        self.api_key = api_key
+        self.workspace = workspace
         self.calls: list[tuple[str, str, dict[str, Any] | None]] = []
         self.closed = False
 
@@ -48,8 +57,8 @@ def test_parser_supports_nested_canary_commands() -> None:
 def test_cli_predict_sends_structured_json(capsys) -> None:
     instances: list[FakeAPI] = []
 
-    def factory(base_url: str, timeout_seconds: float) -> FakeAPI:
-        api = FakeAPI(base_url, timeout_seconds)
+    def factory(*args, **kwargs) -> FakeAPI:
+        api = FakeAPI(*args, **kwargs)
         instances.append(api)
         return api
 
@@ -57,6 +66,8 @@ def test_cli_predict_sends_structured_json(capsys) -> None:
         [
             "--base-url",
             "http://example.test",
+            "--api-key",
+            "mf_live_test",
             "predict",
             "production",
             '{"features":[1,2,3]}',
@@ -65,6 +76,7 @@ def test_cli_predict_sends_structured_json(capsys) -> None:
     )
 
     assert exit_code == 0
+    assert instances[0].api_key == "mf_live_test"
     assert instances[0].calls == [
         (
             "POST",
@@ -82,8 +94,8 @@ def test_cli_predict_sends_structured_json(capsys) -> None:
 def test_cli_canary_promote_uses_lifecycle_endpoint() -> None:
     instances: list[FakeAPI] = []
 
-    def factory(base_url: str, timeout_seconds: float) -> FakeAPI:
-        api = FakeAPI(base_url, timeout_seconds)
+    def factory(*args, **kwargs) -> FakeAPI:
+        api = FakeAPI(*args, **kwargs)
         instances.append(api)
         return api
 
@@ -95,3 +107,20 @@ def test_cli_canary_promote_uses_lifecycle_endpoint() -> None:
     assert instances[0].calls == [
         ("POST", "/deployments/19/canary/promote", None)
     ]
+
+
+def test_cli_workspace_selection_is_forwarded() -> None:
+    instances: list[FakeAPI] = []
+
+    def factory(*args, **kwargs) -> FakeAPI:
+        api = FakeAPI(*args, **kwargs)
+        instances.append(api)
+        return api
+
+    main(
+        ["--workspace", "acme", "whoami"],
+        api_factory=factory,
+    )
+
+    assert instances[0].workspace == "acme"
+    assert instances[0].calls == [("GET", "/auth/me", None)]

@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 
 from modelforge.db.session import get_db
 from modelforge.schemas.inference import PredictionRequest, PredictionResponse
+from modelforge.services.artifact_factory import create_artifact_store
+from modelforge.services.artifacts import ArtifactStore
+from modelforge.services.auth import Principal, get_principal
 from modelforge.services.deployment_targets import DeploymentTargetNotFoundError
 from modelforge.services.external_runtime_bootstrap import (
     create_external_runtime_registry,
@@ -44,7 +47,21 @@ _inference_service = InferenceService(
 
 
 def get_inference_service() -> InferenceService:
+    """Return the shared inference service for cache administration/tests."""
+
     return _inference_service
+
+
+def get_request_inference_service(
+    artifact_store: Annotated[ArtifactStore, Depends(create_artifact_store)],
+) -> InferenceService:
+    """Bind request-scoped artifact storage to the shared runtime/cache layer."""
+
+    return InferenceService(
+        resolver=_runtime_resolver,
+        cache=_model_cache,
+        artifact_store=artifact_store,
+    )
 
 
 def get_runtime_registry() -> RuntimeRegistry:
@@ -63,13 +80,15 @@ def get_external_runtime_registry() -> ExternalRuntimeRegistry:
 def predict(
     request: PredictionRequest,
     session: Annotated[Session, Depends(get_db)],
-    service: Annotated[InferenceService, Depends(get_inference_service)],
+    service: Annotated[InferenceService, Depends(get_request_inference_service)],
+    principal: Annotated[Principal, Depends(get_principal)],
 ) -> PredictionResponse:
     try:
         result = service.predict(
             session,
             environment=request.environment,
             inputs=request.inputs,
+            workspace_id=principal.workspace_id,
         )
     except DeploymentTargetNotFoundError as exc:
         raise HTTPException(

@@ -18,12 +18,26 @@ class ModelForgeCLIError(Exception):
 
 
 class ModelForgeAPI:
-    """Small HTTP client used by the ModelForge CLI."""
+    """Authenticated HTTP client used by the ModelForge CLI."""
 
-    def __init__(self, base_url: str, timeout_seconds: float = 10.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        timeout_seconds: float = 10.0,
+        *,
+        api_key: str | None = None,
+        workspace: str | None = None,
+    ) -> None:
+        headers: dict[str, str] = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        if workspace:
+            headers["X-ModelForge-Workspace"] = workspace
+
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
+            headers=headers,
         )
 
     def close(self) -> None:
@@ -67,9 +81,7 @@ def _json_value(raw: str) -> Any:
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise argparse.ArgumentTypeError(
-            "value must be valid JSON"
-        ) from exc
+        raise argparse.ArgumentTypeError("value must be valid JSON") from exc
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -85,6 +97,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="ModelForge API base URL (or set MODELFORGE_URL).",
     )
     parser.add_argument(
+        "--api-key",
+        default=os.getenv("MODELFORGE_API_KEY"),
+        help="Workspace API key (or set MODELFORGE_API_KEY).",
+    )
+    parser.add_argument(
+        "--workspace",
+        default=os.getenv("MODELFORGE_WORKSPACE"),
+        help="Workspace slug/id for OIDC sessions.",
+    )
+    parser.add_argument(
         "--timeout",
         type=float,
         default=10.0,
@@ -95,11 +117,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     commands.add_parser("status", help="Show API, readiness and runtime health.")
     commands.add_parser("models", help="List registered models.")
+    commands.add_parser("whoami", help="Show the authenticated workspace context.")
 
-    deployments = commands.add_parser(
-        "deployments",
-        help="List deployments.",
-    )
+    deployments = commands.add_parser("deployments", help="List deployments.")
     deployments.add_argument("--environment")
 
     commands.add_parser("runtimes", help="List runtime inventory and health.")
@@ -149,6 +169,9 @@ def _execute(api: ModelForgeAPI, args: argparse.Namespace) -> Any:
             "readiness": api.request("GET", "/ready"),
             "runtime_health": api.request("GET", "/runtimes/health"),
         }
+
+    if args.command == "whoami":
+        return api.request("GET", "/auth/me")
 
     if args.command == "models":
         return api.request("GET", "/models")
@@ -217,13 +240,18 @@ def _execute(api: ModelForgeAPI, args: argparse.Namespace) -> Any:
 def main(
     argv: Sequence[str] | None = None,
     *,
-    api_factory: Callable[[str, float], ModelForgeAPI] = ModelForgeAPI,
+    api_factory: Callable[..., ModelForgeAPI] = ModelForgeAPI,
 ) -> int:
     """Run the ModelForge CLI."""
 
     parser = build_parser()
     args = parser.parse_args(argv)
-    api = api_factory(args.base_url, args.timeout)
+    api = api_factory(
+        args.base_url,
+        args.timeout,
+        api_key=args.api_key,
+        workspace=args.workspace,
+    )
 
     try:
         result = _execute(api, args)

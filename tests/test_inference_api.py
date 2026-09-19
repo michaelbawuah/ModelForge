@@ -469,6 +469,7 @@ def _write_linear_onnx_model(path) -> None:
         ],
     )
 
+    model.ir_version = 13
     onnx.checker.check_model(model)
     onnx.save(model, path)
 

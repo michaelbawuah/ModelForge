@@ -10,13 +10,14 @@ Rather than treating model serving as a single `/predict` endpoint, ModelForge t
 
 | Signal | Current validated result |
 |---|---|
-| Python test suite | **160 passed**, 3 skipped |
+| Python test suite | **164 passed**, 3 skipped |
 | Go validation | `gofmt`, `go test ./...`, and `go vet ./...` green |
 | CI benchmark | **200 / 200 successful requests**, 0% errors |
 | Throughput | **133.5 requests/s** |
 | End-to-end latency | **p50 137.3 ms · p95 231.2 ms · p99 322.8 ms** |
 | Runtime boundary | Python control plane + standalone Go inference service |
 | Release safety | weighted canaries, rollback, circuit breakers, automatic stable fallback |
+| Deployment proof | PASS — canary promotion, rollback, 185.7% regression detection, failed-canary abort, stable-target preservation |
 | Product surfaces | public landing page, multi-tenant SaaS console, REST/OpenAPI, authenticated CLI |
 
 > Benchmark values above come from the post-merge GitHub Actions smoke run on a hosted Ubuntu runner. They are reproducible validation evidence, not hardware-independent production performance claims.
@@ -29,7 +30,19 @@ Start the full stack:
 docker compose up --build --wait --detach
 ```
 
-Seed a real stable + canary deployment:
+Run the full deployment proof:
+
+```bash
+make proof
+```
+
+The proof creates three immutable versions and exercises the actual serving path:
+stable deployment, weighted canary traffic, canary promotion, rollback, an
+intentionally regressed canary, automated abort, and final stable-target
+verification. It writes JSON/JSONL/Markdown evidence to
+`demo-proof-evidence/` and exits non-zero if any lifecycle assertion fails.
+
+For the smaller interactive stable + canary seed:
 
 ```bash
 python demo/bootstrap_demo.py --environment demo --weight 20
@@ -56,7 +69,11 @@ modelforge runtimes
 modelforge predict demo 10
 ```
 
-The seeded demo creates two immutable model versions, promotes version `1.0.0` as stable, and sends 20% of traffic to version `2.0.0` as a canary. Both the dashboard and CLI operate through the public ModelForge API rather than bypassing deployment state internally.
+The full proof goes further: it proves both canary lanes serve real requests,
+promotes version `2.0.0`, rolls back to version `1.0.0`, then detects a large
+output regression in version `3.0.0` and aborts that canary while preserving
+the stable target. Both the dashboard and CLI operate through the public
+ModelForge API rather than bypassing deployment state internally.
 
 ## Architecture
 
@@ -372,7 +389,12 @@ be captured on controlled hardware.
 | p95 latency | 231.2 ms |
 | p99 latency | 322.8 ms |
 
-The latest public-product validation also smoke-tests the installed CLI, public landing page, multi-tenant SaaS console, auth configuration, seeded stable/canary demo, CLI inference, Docker Compose stack, and external Go runtime.
+The latest validation also smoke-tests the installed CLI, public landing page,
+multi-tenant SaaS console, auth configuration, Docker Compose stack, external Go
+runtime, and the full recruiter deployment proof. In that proof, v2 received
+real weighted canary traffic and was promoted, v1 was restored through rollback,
+and an intentionally regressed v3 produced 185.7% output drift against a 50%
+threshold, was recorded FAILED, and left v1 as the authoritative final target.
 
 ### Observability and Readiness
 
@@ -388,6 +410,7 @@ This creates the foundation for measuring reliability and performance rather tha
 - [External runtime contract](docs/runtime-protocol.md)
 - [Public-cloud deployment contract](docs/cloud-deployment.md)
 - [AWS ECS/Fargate reference deployment](infra/aws/README.md)
+- [Recruiter deployment proof](docs/demo-proof.md)
 - [Recruiter and interview brief](docs/recruiting.md)
 
 Common workflows are available through the root `Makefile`:
@@ -397,6 +420,7 @@ make install
 make check
 make up
 make demo
+make proof
 make benchmark
 make down
 ```
@@ -448,7 +472,7 @@ Reliability and performance characteristics should be demonstrated through tests
 
 ## Testing
 
-The post-merge validation checkpoint currently reports **160 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
+The post-merge validation checkpoint currently reports **164 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
 
 ```text
 Artifact storage

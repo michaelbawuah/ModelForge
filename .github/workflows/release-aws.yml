@@ -1,0 +1,267 @@
+name: Release AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional immutable image tag. Defaults to the selected main commit SHA.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: modelforge-production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      MODELFORGE_PUBLIC_URL: ${{ vars.MODELFORGE_PUBLIC_URL }}
+      MODELFORGE_NAME: ${{ vars.MODELFORGE_NAME }}
+      MODELFORGE_ENVIRONMENT: ${{ vars.MODELFORGE_ENVIRONMENT }}
+      MODELFORGE_ECS_CLUSTER: ${{ vars.MODELFORGE_ECS_CLUSTER }}
+      MODELFORGE_API_SERVICE: ${{ vars.MODELFORGE_API_SERVICE }}
+      MODELFORGE_RUNTIME_SERVICE: ${{ vars.MODELFORGE_RUNTIME_SERVICE }}
+      MODELFORGE_API_ECR_REPOSITORY: ${{ vars.MODELFORGE_API_ECR_REPOSITORY }}
+      MODELFORGE_RUNTIME_ECR_REPOSITORY: ${{ vars.MODELFORGE_RUNTIME_ECR_REPOSITORY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate release configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          : "${AWS_REGION:?Set the AWS_REGION repository variable.}"
+          : "${AWS_DEPLOY_ROLE_ARN:?Set the AWS_DEPLOY_ROLE_ARN repository variable.}"
+          : "${MODELFORGE_PUBLIC_URL:?Set the MODELFORGE_PUBLIC_URL repository variable.}"
+
+          if [[ "${MODELFORGE_PUBLIC_URL}" != https://* ]]; then
+            echo "MODELFORGE_PUBLIC_URL must use HTTPS." >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: modelforge-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve release names
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NAME="${MODELFORGE_NAME:-modelforge}"
+          ENVIRONMENT="${MODELFORGE_ENVIRONMENT:-production}"
+          CLUSTER="${MODELFORGE_ECS_CLUSTER:-${NAME}-${ENVIRONMENT}}"
+          API_SERVICE="${MODELFORGE_API_SERVICE:-api}"
+          RUNTIME_SERVICE="${MODELFORGE_RUNTIME_SERVICE:-go-runtime}"
+          API_REPOSITORY="${MODELFORGE_API_ECR_REPOSITORY:-${NAME}-api}"
+          RUNTIME_REPOSITORY="${MODELFORGE_RUNTIME_ECR_REPOSITORY:-${NAME}-go-runtime}"
+
+          TAG="${{ inputs.image_tag }}"
+          if [[ -z "${TAG}" ]]; then
+            TAG="${GITHUB_SHA}"
+          fi
+          if [[ ! "${TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid ECR image tag: ${TAG}" >&2
+            exit 1
+          fi
+
+          API_REPO_URI="$(aws ecr describe-repositories             --repository-names "${API_REPOSITORY}"             --query 'repositories[0].repositoryUri'             --output text)"
+          RUNTIME_REPO_URI="$(aws ecr describe-repositories             --repository-names "${RUNTIME_REPOSITORY}"             --query 'repositories[0].repositoryUri'             --output text)"
+
+          {
+            echo "name=${NAME}"
+            echo "environment=${ENVIRONMENT}"
+            echo "cluster=${CLUSTER}"
+            echo "api_service=${API_SERVICE}"
+            echo "runtime_service=${RUNTIME_SERVICE}"
+            echo "api_family=${NAME}-${ENVIRONMENT}-api"
+            echo "runtime_family=${NAME}-${ENVIRONMENT}-go-runtime"
+            echo "migration_family=${NAME}-${ENVIRONMENT}-migration"
+            echo "tag=${TAG}"
+            echo "api_image=${API_REPO_URI}:${TAG}"
+            echo "runtime_image=${RUNTIME_REPO_URI}:${TAG}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push immutable API image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build             --platform linux/amd64             --tag "${{ steps.release.outputs.api_image }}"             .
+          docker push "${{ steps.release.outputs.api_image }}"
+
+      - name: Build and push immutable Go runtime image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build             --platform linux/amd64             --tag "${{ steps.release.outputs.runtime_image }}"             runtimes/go-runtime
+          docker push "${{ steps.release.outputs.runtime_image }}"
+
+      - name: Register release task definitions
+        id: taskdefs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          register_revision() {
+            local family="$1"
+            local container="$2"
+            local image="$3"
+            local output_file="$4"
+
+            aws ecs describe-task-definition               --task-definition "${family}"               --query taskDefinition               --output json > current-task.json
+
+            jq               --arg container "${container}"               --arg image "${image}"               '
+                del(
+                  .taskDefinitionArn,
+                  .revision,
+                  .status,
+                  .requiresAttributes,
+                  .compatibilities,
+                  .registeredAt,
+                  .registeredBy
+                )
+                | .containerDefinitions |= map(
+                    if .name == $container then .image = $image else . end
+                  )
+              ' current-task.json > "${output_file}"
+
+            aws ecs register-task-definition               --cli-input-json "file://${output_file}"               --query 'taskDefinition.taskDefinitionArn'               --output text
+          }
+
+          API_TASK="$(register_revision             "${{ steps.release.outputs.api_family }}"             api             "${{ steps.release.outputs.api_image }}"             api-task.json)"
+
+          RUNTIME_TASK="$(register_revision             "${{ steps.release.outputs.runtime_family }}"             go-runtime             "${{ steps.release.outputs.runtime_image }}"             runtime-task.json)"
+
+          MIGRATION_TASK="$(register_revision             "${{ steps.release.outputs.migration_family }}"             migration             "${{ steps.release.outputs.api_image }}"             migration-task.json)"
+
+          {
+            echo "api=${API_TASK}"
+            echo "runtime=${RUNTIME_TASK}"
+            echo "migration=${MIGRATION_TASK}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Snapshot current services and migration network
+        id: snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CLUSTER="${{ steps.release.outputs.cluster }}"
+          API_SERVICE="${{ steps.release.outputs.api_service }}"
+          RUNTIME_SERVICE="${{ steps.release.outputs.runtime_service }}"
+
+          API_TASK="$(aws ecs describe-services             --cluster "${CLUSTER}"             --services "${API_SERVICE}"             --query 'services[0].taskDefinition'             --output text)"
+          RUNTIME_TASK="$(aws ecs describe-services             --cluster "${CLUSTER}"             --services "${RUNTIME_SERVICE}"             --query 'services[0].taskDefinition'             --output text)"
+
+          aws ecs describe-services             --cluster "${CLUSTER}"             --services "${API_SERVICE}"             --query 'services[0].networkConfiguration.awsvpcConfiguration'             --output json             | jq '{awsvpcConfiguration: .}' > migration-network.json
+
+          {
+            echo "api_task=${API_TASK}"
+            echo "runtime_task=${RUNTIME_TASK}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Run database migration task
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CLUSTER="${{ steps.release.outputs.cluster }}"
+          TASK_ARN="$(aws ecs run-task             --cluster "${CLUSTER}"             --launch-type FARGATE             --task-definition "${{ steps.taskdefs.outputs.migration }}"             --network-configuration file://migration-network.json             --query 'tasks[0].taskArn'             --output text)"
+
+          if [[ -z "${TASK_ARN}" || "${TASK_ARN}" == "None" ]]; then
+            echo "ECS did not start the migration task." >&2
+            exit 1
+          fi
+
+          aws ecs wait tasks-stopped             --cluster "${CLUSTER}"             --tasks "${TASK_ARN}"
+
+          EXIT_CODE="$(aws ecs describe-tasks             --cluster "${CLUSTER}"             --tasks "${TASK_ARN}"             --query 'tasks[0].containers[0].exitCode'             --output text)"
+          STOPPED_REASON="$(aws ecs describe-tasks             --cluster "${CLUSTER}"             --tasks "${TASK_ARN}"             --query 'tasks[0].stoppedReason'             --output text)"
+
+          if [[ "${EXIT_CODE}" != "0" ]]; then
+            echo "Migration task failed with exit code ${EXIT_CODE}: ${STOPPED_REASON}" >&2
+            exit 1
+          fi
+
+      - name: Deploy external runtime
+        id: deploy_runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws ecs update-service             --cluster "${{ steps.release.outputs.cluster }}"             --service "${{ steps.release.outputs.runtime_service }}"             --task-definition "${{ steps.taskdefs.outputs.runtime }}"             --force-new-deployment             >/dev/null
+
+          echo "MODELFORGE_RUNTIME_UPDATED=true" >> "${GITHUB_ENV}"
+
+          aws ecs wait services-stable             --cluster "${{ steps.release.outputs.cluster }}"             --services "${{ steps.release.outputs.runtime_service }}"
+
+      - name: Deploy API
+        id: deploy_api
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws ecs update-service             --cluster "${{ steps.release.outputs.cluster }}"             --service "${{ steps.release.outputs.api_service }}"             --task-definition "${{ steps.taskdefs.outputs.api }}"             --force-new-deployment             >/dev/null
+
+          echo "MODELFORGE_API_UPDATED=true" >> "${GITHUB_ENV}"
+
+          aws ecs wait services-stable             --cluster "${{ steps.release.outputs.cluster }}"             --services "${{ steps.release.outputs.api_service }}"
+
+      - name: Verify deployed public service
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_URL="${MODELFORGE_PUBLIC_URL%/}"
+
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error "${BASE_URL}/health" >/dev/null               && curl --fail --silent --show-error "${BASE_URL}/ready" >/dev/null; then
+              printf '{"status":"healthy","url":"%s","image_tag":"%s","commit":"%s"}\n'                 "${BASE_URL}"                 "${{ steps.release.outputs.tag }}"                 "${GITHUB_SHA}"                 > release-summary.json
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Post-deploy health verification failed." >&2
+          exit 1
+
+      - name: Roll back services after deployment failure
+        if: failure() && steps.snapshot.outcome == 'success'
+        shell: bash
+        run: |
+          set -u
+
+          if [[ "${MODELFORGE_API_UPDATED:-false}" == "true" ]]; then
+            aws ecs update-service               --cluster "${{ steps.release.outputs.cluster }}"               --service "${{ steps.release.outputs.api_service }}"               --task-definition "${{ steps.snapshot.outputs.api_task }}"               --force-new-deployment               >/dev/null || true
+          fi
+
+          if [[ "${MODELFORGE_RUNTIME_UPDATED:-false}" == "true" ]]; then
+            aws ecs update-service               --cluster "${{ steps.release.outputs.cluster }}"               --service "${{ steps.release.outputs.runtime_service }}"               --task-definition "${{ steps.snapshot.outputs.runtime_task }}"               --force-new-deployment               >/dev/null || true
+          fi
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelforge-aws-release-${{ github.run_id }}
+          path: release-summary.json
+          if-no-files-found: ignore

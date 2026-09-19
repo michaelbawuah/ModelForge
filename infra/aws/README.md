@@ -224,3 +224,77 @@ NAT gateways, ALB, RDS, Fargate, CloudWatch, and public IPv4 resources can incur
 ongoing AWS charges. Destroy disposable environments when they are no longer
 needed. Production databases default to deletion protection; disable that
 setting explicitly before destroying a protected database.
+
+
+## GitHub Actions production releases
+
+After the first infrastructure bootstrap, ModelForge can release from
+[`.github/workflows/release-aws.yml`](../../.github/workflows/release-aws.yml)
+without storing long-lived AWS access keys in GitHub.
+
+The workflow is manual, runs only from `main`, targets the GitHub
+`production` environment, and uses GitHub's OIDC token to assume an AWS role.
+It then:
+
+1. builds immutable API and Go-runtime images;
+2. pushes both images to ECR;
+3. registers new API/runtime/migration task-definition revisions;
+4. runs the migration task and requires exit code 0;
+5. deploys the runtime and waits for ECS stability;
+6. deploys the API and waits for ECS stability;
+7. verifies public `/health` and `/ready`;
+8. rolls services back to their previous task definitions if deployment or
+   verification fails.
+
+### AWS OIDC trust
+
+AWS accounts normally have one GitHub OIDC provider for
+`https://token.actions.githubusercontent.com`. Pass that provider ARN into:
+
+```hcl
+github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+```
+
+Terraform then creates `github_actions_deploy_role_arn`. Its trust policy is
+restricted to:
+
+```text
+repo:michaelbawuah/ModelForge:environment:production
+```
+
+If this repository is forked or renamed, override `github_repository`. If a
+different protected GitHub environment is used, override
+`github_environment`.
+
+The deploy policy grants only the release-plane permissions required for the
+two ECR repositories, ECS service/task operations, and passing the existing
+ModelForge ECS roles.
+
+### GitHub repository variables
+
+Configure these non-secret GitHub Actions variables:
+
+```text
+AWS_DEPLOY_ROLE_ARN=<terraform output github_actions_deploy_role_arn>
+AWS_REGION=us-east-1
+MODELFORGE_PUBLIC_URL=https://modelforge.example.com
+```
+
+The workflow derives the standard Terraform resource names automatically.
+Only set these optional variables when the Terraform naming defaults were
+changed:
+
+```text
+MODELFORGE_NAME
+MODELFORGE_ENVIRONMENT
+MODELFORGE_ECS_CLUSTER
+MODELFORGE_API_SERVICE
+MODELFORGE_RUNTIME_SERVICE
+MODELFORGE_API_ECR_REPOSITORY
+MODELFORGE_RUNTIME_ECR_REPOSITORY
+```
+
+Use GitHub environment protection rules on `production` when release approval
+is required. The AWS trust policy binds the OIDC subject to that environment,
+so changing the workflow branch alone cannot satisfy the production role's
+trust condition.

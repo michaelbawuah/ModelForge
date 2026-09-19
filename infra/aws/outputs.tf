@@ -64,3 +64,12 @@ output "private_app_subnet_ids" {
 output "api_security_group_id" {
   value = aws_security_group.api.id
 }
+
+output "github_actions_deploy_role_arn" {
+  description = "OIDC deploy role ARN when github_oidc_provider_arn is configured."
+  value = (
+    var.github_oidc_provider_arn == null
+    ? null
+    : aws_iam_role.github_actions_deploy[0].arn
+  )
+}

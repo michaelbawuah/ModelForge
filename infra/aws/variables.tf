@@ -211,3 +211,21 @@ variable "log_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "github_oidc_provider_arn" {
+  description = "Existing AWS IAM OIDC provider ARN for token.actions.githubusercontent.com. Null disables creation of the GitHub deploy role."
+  type        = string
+  default     = null
+}
+
+variable "github_repository" {
+  description = "GitHub repository allowed to assume the optional deploy role."
+  type        = string
+  default     = "michaelbawuah/ModelForge"
+}
+
+variable "github_environment" {
+  description = "GitHub environment encoded into the OIDC subject for production releases."
+  type        = string
+  default     = "production"
+}

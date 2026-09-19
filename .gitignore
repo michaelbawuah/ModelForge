@@ -48,3 +48,6 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Generated demo proof evidence
+demo-proof-evidence/

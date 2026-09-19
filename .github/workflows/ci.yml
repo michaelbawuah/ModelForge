@@ -169,6 +169,13 @@ jobs:
         run: |
           modelforge deployments --environment ci-demo > cli-deployments.json
           modelforge predict ci-demo 10 > cli-prediction.json
+      - name: Run recruiter deployment proof
+        run: >-
+          python demo/proof_scenario.py
+          --environment ci-proof
+          --weight 50
+          --traffic-requests 60
+          --output-dir demo-proof-evidence
       - name: Bootstrap external benchmark deployment
         run: >-
           python benchmarks/bootstrap_external.py
@@ -197,6 +204,7 @@ jobs:
             cli-deployments.json
             cli-prediction.json
             demo-bootstrap.json
+            demo-proof-evidence/
             landing-smoke.html
             dashboard-smoke.html
             auth-config.json

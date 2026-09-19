@@ -17,6 +17,7 @@ from modelforge.schemas.deployments import (
     DeploymentFailure,
     DeploymentRead,
 )
+from modelforge.services.auth import Principal, get_principal, require_role
 from modelforge.services.canaries import (
     CanaryAlreadyExistsError,
     CanaryNotConfiguredError,
@@ -43,6 +44,7 @@ from modelforge.services.deployments import (
 router = APIRouter(prefix="/deployments", tags=["deployments"])
 
 DatabaseSession = Annotated[Session, Depends(get_db)]
+CurrentPrincipal = Annotated[Principal, Depends(get_principal)]
 
 
 def _not_found(deployment_id: int) -> HTTPException:
@@ -67,12 +69,15 @@ def _conflict(message: str) -> HTTPException:
 def create_registered_deployment(
     payload: DeploymentCreate,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
+    require_role(principal, "developer")
     try:
         return create_deployment(
             session,
             model_version_id=payload.model_version_id,
             environment=payload.environment,
+            workspace_id=principal.workspace_id,
         )
     except ModelVersionNotFoundError as exc:
         raise HTTPException(
@@ -94,10 +99,11 @@ def create_registered_deployment(
 @router.get("", response_model=list[DeploymentRead])
 def get_deployments(
     session: DatabaseSession,
+    principal: CurrentPrincipal,
     environment: Annotated[str | None, Query()] = None,
 ) -> list[Deployment]:
     try:
-        return list_deployments(session, environment=environment)
+        return list_deployments(session, environment=environment, workspace_id=principal.workspace_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -109,9 +115,10 @@ def get_deployments(
 def get_registered_deployment(
     deployment_id: int,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
     try:
-        return get_deployment(session, deployment_id)
+        return get_deployment(session, deployment_id, workspace_id=principal.workspace_id)
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
 
@@ -120,9 +127,11 @@ def get_registered_deployment(
 def promote_registered_deployment(
     deployment_id: int,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
+    require_role(principal, "developer")
     try:
-        return promote_deployment(session, deployment_id=deployment_id)
+        return promote_deployment(session, deployment_id=deployment_id, workspace_id=principal.workspace_id)
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
     except InvalidDeploymentTransitionError as exc:
@@ -134,13 +143,16 @@ def fail_registered_deployment(
     deployment_id: int,
     payload: DeploymentFailure,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
+    require_role(principal, "developer")
     try:
         return transition_deployment(
             session,
             deployment_id=deployment_id,
             target_state=DeploymentState.FAILED,
             failure_reason=payload.reason,
+            workspace_id=principal.workspace_id,
         )
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
@@ -157,9 +169,11 @@ def fail_registered_deployment(
 def rollback_registered_deployment(
     deployment_id: int,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
+    require_role(principal, "developer")
     try:
-        return rollback_deployment(session, deployment_id=deployment_id)
+        return rollback_deployment(session, deployment_id=deployment_id, workspace_id=principal.workspace_id)
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
     except (
@@ -174,12 +188,15 @@ def start_registered_canary(
     deployment_id: int,
     payload: CanaryStart,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
+    require_role(principal, "developer")
     try:
         return start_canary(
             session,
             deployment_id=deployment_id,
             weight=payload.weight,
+            workspace_id=principal.workspace_id,
         )
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
@@ -199,12 +216,15 @@ def change_registered_canary_weight(
     deployment_id: int,
     payload: CanaryWeightUpdate,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> DeploymentTarget:
+    require_role(principal, "developer")
     try:
         return update_canary_weight(
             session,
             deployment_id=deployment_id,
             weight=payload.weight,
+            workspace_id=principal.workspace_id,
         )
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
@@ -222,9 +242,11 @@ def change_registered_canary_weight(
 def promote_registered_canary(
     deployment_id: int,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
+    require_role(principal, "developer")
     try:
-        return promote_canary(session, deployment_id=deployment_id)
+        return promote_canary(session, deployment_id=deployment_id, workspace_id=principal.workspace_id)
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
     except (
@@ -243,12 +265,15 @@ def abort_registered_canary(
     deployment_id: int,
     payload: CanaryAbort,
     session: DatabaseSession,
+    principal: CurrentPrincipal,
 ) -> Deployment:
+    require_role(principal, "developer")
     try:
         return abort_canary(
             session,
             deployment_id=deployment_id,
             reason=payload.reason,
+            workspace_id=principal.workspace_id,
         )
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc

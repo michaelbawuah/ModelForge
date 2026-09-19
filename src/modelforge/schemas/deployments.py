@@ -44,6 +44,7 @@ class DeploymentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    workspace_id: int
     model_version_id: int
     environment: str
     state: DeploymentState

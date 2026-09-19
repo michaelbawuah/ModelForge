@@ -1,41 +1,39 @@
-"""Deployment lifecycle orchestration for ModelForge."""
+"""Workspace-scoped deployment lifecycle orchestration."""
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from modelforge.models.deployment import Deployment, DeploymentState
-from modelforge.models.registry import ModelVersion
+from modelforge.models.registry import Model, ModelVersion
 from modelforge.services.deployment_targets import set_deployment_target
+
+DEFAULT_WORKSPACE_ID = 1
 
 
 class DeploymentNotFoundError(Exception):
-    """Raised when a deployment does not exist."""
+    pass
 
 
 class ModelVersionNotFoundError(Exception):
-    """Raised when a model version does not exist."""
+    pass
 
 
 class DeploymentAlreadyExistsError(Exception):
-    """Raised when a version already has a deployment in an environment."""
+    pass
 
 
 class InvalidDeploymentTransitionError(Exception):
-    """Raised when a deployment attempts an illegal lifecycle transition."""
+    pass
 
 
 class ActiveDeploymentNotFoundError(Exception):
-    """Raised when an environment has no active deployment to replace."""
+    pass
 
 
 VALID_TRANSITIONS: dict[DeploymentState, frozenset[DeploymentState]] = {
     DeploymentState.DEPLOYING: frozenset(
-        {
-            DeploymentState.CANARY,
-            DeploymentState.ACTIVE,
-            DeploymentState.FAILED,
-        }
+        {DeploymentState.CANARY, DeploymentState.ACTIVE, DeploymentState.FAILED}
     ),
     DeploymentState.CANARY: frozenset(
         {
@@ -45,27 +43,36 @@ VALID_TRANSITIONS: dict[DeploymentState, frozenset[DeploymentState]] = {
         }
     ),
     DeploymentState.ACTIVE: frozenset(
-        {
-            DeploymentState.SUPERSEDED,
-            DeploymentState.FAILED,
-        }
+        {DeploymentState.SUPERSEDED, DeploymentState.FAILED}
     ),
     DeploymentState.FAILED: frozenset(),
-    DeploymentState.SUPERSEDED: frozenset(
-        {
-            DeploymentState.ACTIVE,
-        }
-    ),
+    DeploymentState.SUPERSEDED: frozenset({DeploymentState.ACTIVE}),
 }
 
 
 def _normalize_environment(environment: str) -> str:
-    """Normalize environment names used as deployment identities."""
-
     normalized = environment.strip().lower()
     if not normalized:
         raise ValueError("environment cannot be empty.")
     return normalized
+
+
+def _get_model_version(
+    session: Session,
+    model_version_id: int,
+    workspace_id: int,
+) -> ModelVersion:
+    model_version = session.scalar(
+        select(ModelVersion)
+        .join(Model, Model.id == ModelVersion.model_id)
+        .where(
+            ModelVersion.id == model_version_id,
+            Model.workspace_id == workspace_id,
+        )
+    )
+    if model_version is None:
+        raise ModelVersionNotFoundError(model_version_id)
+    return model_version
 
 
 def create_deployment(
@@ -73,18 +80,15 @@ def create_deployment(
     *,
     model_version_id: int,
     environment: str,
+    workspace_id: int = DEFAULT_WORKSPACE_ID,
 ) -> Deployment:
-    """Create a deployment in the DEPLOYING state."""
-
-    model_version = session.get(ModelVersion, model_version_id)
-    if model_version is None:
-        raise ModelVersionNotFoundError(model_version_id)
-
-    normalized_environment = _normalize_environment(environment)
+    _get_model_version(session, model_version_id, workspace_id)
+    normalized = _normalize_environment(environment)
 
     deployment = Deployment(
+        workspace_id=workspace_id,
         model_version_id=model_version_id,
-        environment=normalized_environment,
+        environment=normalized,
         state=DeploymentState.DEPLOYING.value,
     )
     session.add(deployment)
@@ -94,18 +98,21 @@ def create_deployment(
     except IntegrityError as exc:
         session.rollback()
         raise DeploymentAlreadyExistsError(
-            (model_version_id, normalized_environment)
+            (workspace_id, model_version_id, normalized)
         ) from exc
 
     session.refresh(deployment)
     return deployment
 
 
-def get_deployment(session: Session, deployment_id: int) -> Deployment:
-    """Return a deployment or raise when it does not exist."""
-
+def get_deployment(
+    session: Session,
+    deployment_id: int,
+    *,
+    workspace_id: int = DEFAULT_WORKSPACE_ID,
+) -> Deployment:
     deployment = session.get(Deployment, deployment_id)
-    if deployment is None:
+    if deployment is None or deployment.workspace_id != workspace_id:
         raise DeploymentNotFoundError(deployment_id)
     return deployment
 
@@ -114,18 +121,14 @@ def list_deployments(
     session: Session,
     *,
     environment: str | None = None,
+    workspace_id: int = DEFAULT_WORKSPACE_ID,
 ) -> list[Deployment]:
-    """Return deployments in deterministic ID order."""
-
-    statement = select(Deployment)
-
+    statement = select(Deployment).where(Deployment.workspace_id == workspace_id)
     if environment is not None:
         statement = statement.where(
             Deployment.environment == _normalize_environment(environment)
         )
-
-    statement = statement.order_by(Deployment.id)
-    return list(session.scalars(statement))
+    return list(session.scalars(statement.order_by(Deployment.id)))
 
 
 def transition_deployment(
@@ -134,10 +137,13 @@ def transition_deployment(
     deployment_id: int,
     target_state: DeploymentState,
     failure_reason: str | None = None,
+    workspace_id: int = DEFAULT_WORKSPACE_ID,
 ) -> Deployment:
-    """Apply one validated deployment lifecycle transition."""
-
-    deployment = get_deployment(session, deployment_id)
+    deployment = get_deployment(
+        session,
+        deployment_id,
+        workspace_id=workspace_id,
+    )
     current_state = DeploymentState(deployment.state)
 
     if target_state not in VALID_TRANSITIONS[current_state]:
@@ -153,9 +159,7 @@ def transition_deployment(
             )
         deployment.failure_reason = failure_reason.strip()
     elif failure_reason is not None:
-        raise ValueError(
-            "failure_reason may only be supplied for a FAILED deployment."
-        )
+        raise ValueError("failure_reason may only be supplied for a FAILED deployment.")
     else:
         deployment.failure_reason = None
 
@@ -169,19 +173,19 @@ def promote_deployment(
     session: Session,
     *,
     deployment_id: int,
+    workspace_id: int = DEFAULT_WORKSPACE_ID,
 ) -> Deployment:
-    """Atomically make a DEPLOYING deployment active in its environment."""
-
     try:
         target = session.scalar(
             select(Deployment)
-            .where(Deployment.id == deployment_id)
+            .where(
+                Deployment.id == deployment_id,
+                Deployment.workspace_id == workspace_id,
+            )
             .with_for_update()
         )
-
         if target is None:
             raise DeploymentNotFoundError(deployment_id)
-
         if DeploymentState(target.state) is not DeploymentState.DEPLOYING:
             raise InvalidDeploymentTransitionError(
                 f"Deployment {deployment_id} must be DEPLOYING before promotion."
@@ -190,13 +194,13 @@ def promote_deployment(
         current_active = session.scalar(
             select(Deployment)
             .where(
+                Deployment.workspace_id == workspace_id,
                 Deployment.environment == target.environment,
                 Deployment.state == DeploymentState.ACTIVE.value,
                 Deployment.id != target.id,
             )
             .with_for_update()
         )
-
         if current_active is not None:
             current_active.state = DeploymentState.SUPERSEDED.value
 
@@ -206,14 +210,13 @@ def promote_deployment(
 
         set_deployment_target(
             session,
+            workspace_id=workspace_id,
             environment=target.environment,
             deployment_id=target.id,
         )
-
         session.commit()
         session.refresh(target)
         return target
-
     except Exception:
         session.rollback()
         raise
@@ -223,19 +226,19 @@ def rollback_deployment(
     session: Session,
     *,
     deployment_id: int,
+    workspace_id: int = DEFAULT_WORKSPACE_ID,
 ) -> Deployment:
-    """Atomically restore a superseded deployment to ACTIVE."""
-
     try:
         target = session.scalar(
             select(Deployment)
-            .where(Deployment.id == deployment_id)
+            .where(
+                Deployment.id == deployment_id,
+                Deployment.workspace_id == workspace_id,
+            )
             .with_for_update()
         )
-
         if target is None:
             raise DeploymentNotFoundError(deployment_id)
-
         if DeploymentState(target.state) is not DeploymentState.SUPERSEDED:
             raise InvalidDeploymentTransitionError(
                 f"Deployment {deployment_id} must be SUPERSEDED before rollback."
@@ -244,13 +247,13 @@ def rollback_deployment(
         current_active = session.scalar(
             select(Deployment)
             .where(
+                Deployment.workspace_id == workspace_id,
                 Deployment.environment == target.environment,
                 Deployment.state == DeploymentState.ACTIVE.value,
                 Deployment.id != target.id,
             )
             .with_for_update()
         )
-
         if current_active is None:
             raise ActiveDeploymentNotFoundError(target.environment)
 
@@ -261,14 +264,13 @@ def rollback_deployment(
 
         set_deployment_target(
             session,
+            workspace_id=workspace_id,
             environment=target.environment,
             deployment_id=target.id,
         )
-
         session.commit()
         session.refresh(target)
         return target
-
     except Exception:
         session.rollback()
         raise

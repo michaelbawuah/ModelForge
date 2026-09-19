@@ -20,6 +20,7 @@ def _session_with_deployment(
 
     deployment = Deployment(
         id=1,
+        workspace_id=1,
         model_version_id=10,
         environment="production",
         state=state.value,

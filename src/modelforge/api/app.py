@@ -5,11 +5,13 @@ from fastapi import FastAPI
 from modelforge.api.dashboard import router as dashboard_router
 from modelforge.api.deployment_targets import router as deployment_target_router
 from modelforge.api.deployments import router as deployment_router
+from modelforge.api.identity import router as identity_router
 from modelforge.api.inference import router as inference_router
 from modelforge.api.metrics import router as metrics_router
 from modelforge.api.registry import router as registry_router
 from modelforge.api.runtimes import router as runtime_router
 from modelforge.api.system import router as system_router
+from modelforge.services.security import configure_security
 
 
 def create_app() -> FastAPI:
@@ -20,6 +22,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Reliability-aware ML deployment platform.",
     )
+    configure_security(app)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
@@ -31,6 +34,7 @@ def create_app() -> FastAPI:
         }
 
     app.include_router(dashboard_router)
+    app.include_router(identity_router)
     app.include_router(registry_router)
     app.include_router(deployment_router)
     app.include_router(deployment_target_router)

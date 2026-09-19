@@ -50,14 +50,27 @@ class RequestSecurityMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = (
             "camera=(), microphone=(), geolocation=()"
         )
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "connect-src 'self'; "
-            "img-src 'self' data:; "
-            "frame-ancestors 'none';"
-        )
+        if request.url.path.startswith(("/docs", "/redoc")):
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https://fastapi.tiangolo.com; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self';"
+            )
+        else:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "style-src 'self'; "
+                "script-src 'self'; "
+                "connect-src 'self'; "
+                "img-src 'self' data:; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self';"
+            )
 
         forwarded_proto = request.headers.get("X-Forwarded-Proto", "")
         if request.url.scheme == "https" or forwarded_proto == "https":
@@ -95,6 +108,7 @@ def configure_security(app: FastAPI) -> None:
             allow_headers=[
                 "Authorization",
                 "Content-Type",
+                "X-ModelForge-CSRF",
                 "X-ModelForge-Workspace",
                 "X-Request-ID",
             ],

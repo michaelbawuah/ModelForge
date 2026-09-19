@@ -1,4 +1,4 @@
-"""Identity, workspace, membership, and API-key database entities."""
+"""Identity, workspace, membership, API-key, and browser-session entities."""
 
 from __future__ import annotations
 
@@ -31,6 +31,10 @@ class User(Base):
     )
 
     memberships: Mapped[list[WorkspaceMember]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    browser_sessions: Mapped[list[BrowserSession]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
@@ -134,3 +138,50 @@ class ApiKey(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     workspace: Mapped[Workspace] = relationship()
+
+
+class BrowserSession(Base):
+    """Opaque browser session; raw session and CSRF secrets never reach the DB."""
+
+    __tablename__ = "browser_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    csrf_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="browser_sessions")
+
+
+class OidcLoginChallenge(Base):
+    """Short-lived server-side PKCE state for one OIDC authorization attempt."""
+
+    __tablename__ = "oidc_login_challenges"
+
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    code_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    nonce: Mapped[str] = mapped_column(String(128), nullable=False)
+    redirect_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ModelForge is framework-neutral ML deployment infrastructure for model versioning, canary releases, rollback, artifact integrity, and inference.">
+  <title>ModelForge — ML deployment infrastructure</title>
+  <link rel="stylesheet" href="/assets/landing.css">
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="/"><span class="mark">M</span><span>ModelForge</span></a>
+    <div class="navlinks"><a href="#platform">Platform</a><a href="/docs">API Docs</a><a class="btn" href="/dashboard">Open console</a></div>
+  </nav>
+  <main>
+    <section class="hero">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Framework-neutral ML infrastructure</span>
+        <h1>Deploy any model.<br><span class="gradient">Operate it safely.</span></h1>
+        <p class="lead">ModelForge gives engineering teams one control plane for model versions, immutable artifacts, runtime plugins, canary traffic, health-aware serving, observability, and rollback.</p>
+        <div class="cta"><a class="btn primary" href="/auth/login?next=/dashboard">Get started</a><a class="btn" href="/docs">Explore the API</a></div>
+        <div class="subcopy">PyTorch, ONNX, Go runtimes, and future frameworks through the same deployment contract.</div>
+      </div>
+      <div class="console">
+        <div class="console-top"><span class="c-dot"></span><span class="c-dot"></span><span class="c-dot"></span><span class="console-title">production — ModelForge</span></div>
+        <div class="console-body">
+          <div><span class="prompt">$</span> <span class="cmd">modelforge deployments --environment production</span></div>
+          <div class="dim">stable&nbsp;&nbsp;sentiment-v3&nbsp;&nbsp;ACTIVE&nbsp;&nbsp;90%</div>
+          <div class="dim">canary&nbsp;&nbsp;sentiment-v4&nbsp;&nbsp;CANARY&nbsp;&nbsp;10%</div><br>
+          <div><span class="prompt">$</span> <span class="cmd">modelforge canary promote 14</span></div>
+          <div><span class="ok">✓</span> sentiment-v4 promoted to production</div>
+          <div><span class="ok">✓</span> previous deployment preserved for rollback</div>
+          <div class="metrics"><div class="metric"><strong>SHA-256</strong><span>artifact integrity</span></div><div class="metric"><strong>10%</strong><span>canary traffic</span></div><div class="metric"><strong>1 cmd</strong><span>rollback path</span></div></div>
+        </div>
+      </div>
+    </section>
+    <section class="section" id="platform">
+      <div class="section-head"><span class="eyebrow">Control plane</span><h2>Model operations without framework lock-in.</h2><p>The core stays stable while runtimes evolve. New frameworks implement the runtime contract instead of forcing rewrites across the platform.</p></div>
+      <div class="grid">
+        <article class="card"><div class="icon">◇</div><h3>Version + artifact integrity</h3><p>Immutable model versions, checksum verification, tenant-separated storage, and S3-compatible artifact backends.</p></article>
+        <article class="card"><div class="icon">↗</div><h3>Progressive delivery</h3><p>Stable and canary targets, controlled traffic weights, promotion, failure isolation, and fast rollback.</p></article>
+        <article class="card"><div class="icon">⌁</div><h3>Extensible runtimes</h3><p>In-process and external adapters let PyTorch, ONNX, Go, Fluxion, or future frameworks use one control plane.</p></article>
+        <article class="card"><div class="icon">◎</div><h3>Workspace isolation</h3><p>Users, roles, API keys, models, deployments, targets, artifacts, and inference all resolve inside a tenant boundary.</p></article>
+        <article class="card"><div class="icon">∿</div><h3>Observability</h3><p>Runtime health, inference metadata, request IDs, Prometheus metrics, readiness, and circuit-breaker state.</p></article>
+        <article class="card"><div class="icon">⌘</div><h3>Developer-first access</h3><p>Browser console, authenticated CLI, HTTP API, and workspace-scoped credentials share the same backend semantics.</p></article>
+      </div>
+    </section>
+    <section class="section">
+      <div class="section-head"><span class="eyebrow">Architecture</span><h2>A stable core. Pluggable execution.</h2></div>
+      <div class="arch"><div class="node"><strong>Console + CLI</strong><span>teams, automation, API keys</span></div><div class="arrow">→</div><div class="node"><strong>ModelForge control plane</strong><span>registry, deployments, routing, policy</span></div><div class="arrow">→</div><div class="node"><strong>Runtime adapters</strong><span>PyTorch · ONNX · Go · future</span></div></div>
+    </section>
+  </main>
+  <footer><span>ModelForge</span><span>Framework-neutral ML deployment infrastructure.</span></footer>
+</div>
+</body>
+</html>

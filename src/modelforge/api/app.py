@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 
+from modelforge.api.browser_auth import router as browser_auth_router
 from modelforge.api.dashboard import router as dashboard_router
 from modelforge.api.deployment_targets import router as deployment_target_router
 from modelforge.api.deployments import router as deployment_router
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
         }
 
     app.include_router(dashboard_router)
+    app.include_router(browser_auth_router)
     app.include_router(identity_router)
     app.include_router(registry_router)
     app.include_router(deployment_router)

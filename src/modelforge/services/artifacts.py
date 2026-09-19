@@ -200,7 +200,7 @@ class LocalArtifactStore:
         self._remove_empty_parents(path.parent)
 
     def _managed_path(self, uri: str) -> Path:
-        value = uri[7:] if uri.startswith("file://") else uri
+        value = uri.removeprefix("file://")
         path = Path(value).resolve()
 
         try:

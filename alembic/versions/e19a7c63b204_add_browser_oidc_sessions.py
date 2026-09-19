@@ -61,6 +61,7 @@ def upgrade() -> None:
         "oidc_login_challenges",
         sa.Column("state_hash", sa.String(length=64), nullable=False),
         sa.Column("code_verifier", sa.String(length=128), nullable=False),
+        sa.Column("nonce", sa.String(length=128), nullable=False),
         sa.Column("redirect_path", sa.String(length=512), nullable=False),
         sa.Column(
             "created_at",

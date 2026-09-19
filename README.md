@@ -68,11 +68,11 @@ ModelForge models deployment as explicit state rather than simply changing a mod
 Deployment states include:
 
 ```text
-DEPLOYING → ACTIVE
-     │
-     └────→ FAILED
-
-ACTIVE → SUPERSEDED
+DEPLOYING ──→ ACTIVE ──→ SUPERSEDED
+    │            │
+    ├──→ CANARY ─┘
+    │      │
+    └────→ FAILED
 ```
 
 Environment targets identify the authoritative active deployment.
@@ -191,6 +191,82 @@ Python ModelForge Control Plane
 ```
 
 Live integration tests exercise the Python external-runtime client against the running Go service, proving that ModelForge can execute inference across a real language and process boundary.
+
+### Runtime Resilience
+
+External runtimes are protected by framework-independent resilience policies:
+
+- bounded retries for transient transport and server failures
+- exponential retry backoff
+- per-runtime circuit breakers
+- automatic half-open recovery after a cooldown window
+- runtime inventory and health inspection endpoints
+- Prometheus counters for requests, retries, and open-circuit rejections
+
+These policies live at the runtime boundary, so the same reliability behavior
+applies to Go, Fluxion, or a framework that does not exist yet.
+
+### Canary Releases and Automatic Fallback
+
+ModelForge can keep a stable deployment active while routing a configurable
+percentage of traffic to a canary.
+
+The canary lifecycle supports:
+
+- transactional canary start
+- weighted traffic routing
+- traffic reweighting
+- canary promotion to stable
+- manual canary abort
+- automatic removal of a canary after serving infrastructure failures
+- immediate fallback to the stable deployment for the triggering request
+
+Prediction responses identify whether they were served by the stable or canary
+lane and whether automatic fallback occurred.
+
+### Load Testing and Failure Injection
+
+ModelForge includes a reproducible benchmark harness for exercising the full
+HTTP serving path and reporting:
+
+- throughput in requests per second
+- success and error rates
+- p50, p95, and p99 end-to-end latency
+- HTTP status-code distribution
+- stable versus canary traffic counts
+- automatic canary fallback counts
+
+Create an external Go-runtime benchmark deployment and run load:
+
+```bash
+python benchmarks/bootstrap_external.py \
+  --environment benchmark-go \
+  --output benchmark-bootstrap.json
+
+python benchmarks/load_test.py \
+  --environment benchmark-go \
+  --requests 5000 \
+  --concurrency 50 \
+  --warmup 100 \
+  --output benchmark-results.json
+```
+
+The Go runtime supports deterministic, opt-in fault injection:
+
+```bash
+MODELFORGE_GO_RUNTIME_FAIL_EVERY=2 \
+MODELFORGE_GO_RUNTIME_DELAY_MS=25 \
+docker compose up --build --wait
+```
+
+Fault injection defaults to disabled. It exists so retry, circuit-breaker,
+latency, and fallback behavior can be reproduced without adding
+framework-specific failure logic to the control plane.
+
+CI also runs a smaller end-to-end benchmark smoke test and uploads its JSON
+result as a workflow artifact. Hosted-runner measurements are validation
+evidence rather than stable performance claims; release-quality numbers should
+be captured on controlled hardware.
 
 ### Observability and Readiness
 
@@ -355,12 +431,6 @@ Upcoming engineering milestones include:
 
 - distributed caching and coordination
 - asynchronous inference and worker execution
-- runtime fleet health management
-- retry, circuit-breaker, and resilience policies
-- canary deployment strategies
-- automated rollback policies
-- load and performance testing
-- failure-injection experiments
 - cloud deployment
 - expanded serving observability
 

@@ -1,4 +1,4 @@
-.PHONY: install lint test go-test check up down demo benchmark clean
+.PHONY: install lint test go-test check up down demo proof benchmark clean
 
 install:
 	python -m pip install -e ".[dev,pytorch,onnx]"
@@ -25,9 +25,12 @@ down:
 demo:
 	python demo/bootstrap_demo.py --environment demo --weight 20
 
+proof:
+	python demo/proof_scenario.py --environment recruiter-demo --output-dir demo-proof-evidence
+
 benchmark:
 	python benchmarks/bootstrap_external.py --environment benchmark-go
 	python benchmarks/load_test.py --environment benchmark-go --requests 5000 --concurrency 50 --warmup 100 --output benchmark-results.json
 
 clean:
-	rm -rf .pytest_cache .ruff_cache .coverage htmlcov benchmark-results.json
+	rm -rf .pytest_cache .ruff_cache .coverage htmlcov benchmark-results.json demo-proof-evidence

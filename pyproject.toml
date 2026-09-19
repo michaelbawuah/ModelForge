@@ -43,3 +43,4 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+\n[tool.setuptools.package-data]\n"modelforge.dashboard" = ["*.html"]\n

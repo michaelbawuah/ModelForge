@@ -1,0 +1,1 @@
+"""Bundled ModelForge dashboard assets."""

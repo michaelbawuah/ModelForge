@@ -73,7 +73,7 @@ def _require_status(
 
 def _require_close(actual: Any, expected: float, *, label: str) -> None:
     if not isinstance(actual, (int, float)) or isinstance(actual, bool):
-        raise RuntimeError(f"{label} returned non-numeric output: {actual!r}")
+        raise TypeError(f"{label} returned non-numeric output: {actual!r}")
     if not math.isclose(
         float(actual),
         expected,

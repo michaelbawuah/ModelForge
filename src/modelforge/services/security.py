@@ -95,6 +95,7 @@ def configure_security(app: FastAPI) -> None:
             allow_headers=[
                 "Authorization",
                 "Content-Type",
+                "X-ModelForge-CSRF",
                 "X-ModelForge-Workspace",
                 "X-Request-ID",
             ],

@@ -388,6 +388,7 @@ This creates the foundation for measuring reliability and performance rather tha
 - [External runtime contract](docs/runtime-protocol.md)
 - [Public-cloud deployment contract](docs/cloud-deployment.md)
 - [AWS ECS/Fargate reference deployment](infra/aws/README.md)
+- [Hosted recruiter-demo proof](docs/live-demo.md)
 - [Recruiter and interview brief](docs/recruiting.md)
 
 Common workflows are available through the root `Makefile`:
@@ -558,7 +559,7 @@ ModelForge is under active development.
 
 Upcoming engineering milestones include:
 
-- hosted AWS release evidence and production smoke validation
+- run the hosted AWS release + recruiter-demo proof in the real production account
 - controlled-hardware performance baselines
 - distributed caching and coordination
 - asynchronous inference and worker execution

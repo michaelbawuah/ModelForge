@@ -6,6 +6,52 @@ The project explores the systems engineering behind production ML: immutable mod
 
 Rather than treating model serving as a single `/predict` endpoint, ModelForge treats it as a reliability problem spanning the model lifecycle from artifact registration to production execution.
 
+## Project Snapshot
+
+| Signal | Current validated result |
+|---|---|
+| Python test suite | **121 passed**, 3 skipped |
+| Go validation | `gofmt`, `go test ./...`, and `go vet ./...` green |
+| CI benchmark | **200 / 200 successful requests**, 0% errors |
+| Throughput | **133.5 requests/s** |
+| End-to-end latency | **p50 137.3 ms · p95 231.2 ms · p99 322.8 ms** |
+| Runtime boundary | Python control plane + standalone Go inference service |
+| Release safety | weighted canaries, rollback, circuit breakers, automatic stable fallback |
+| Operator surfaces | REST/OpenAPI, browser dashboard, installable CLI |
+
+> Benchmark values above come from the post-merge GitHub Actions smoke run on a hosted Ubuntu runner. They are reproducible validation evidence, not hardware-independent production performance claims.
+
+## Quick Demo
+
+Start the full stack:
+
+```bash
+docker compose up --build --wait --detach
+```
+
+Seed a real stable + canary deployment:
+
+```bash
+python demo/bootstrap_demo.py --environment demo --weight 20
+```
+
+Open the operator dashboard:
+
+```text
+http://localhost:8000/dashboard
+```
+
+Or use the CLI:
+
+```bash
+modelforge status
+modelforge deployments --environment demo
+modelforge runtimes
+modelforge predict demo 10
+```
+
+The seeded demo creates two immutable model versions, promotes version `1.0.0` as stable, and sends 20% of traffic to version `2.0.0` as a canary. Both the dashboard and CLI operate through the public ModelForge API rather than bypassing deployment state internally.
+
 ## Architecture
 
 ```text
@@ -44,6 +90,22 @@ Rather than treating model serving as a single `/predict` endpoint, ModelForge t
 ```
 
 ## Implemented Capabilities
+
+### Operational Dashboard and CLI
+
+ModelForge includes two first-class operator surfaces on top of the same public API.
+
+The browser dashboard at `/dashboard` exposes:
+
+- API readiness and external-runtime health
+- model and immutable-version inventory
+- deployment state by environment
+- stable/canary targets and traffic weights
+- runtime mode, circuit state, and failure count
+- live inference with model-version and traffic-lane metadata
+- promotion, rollback, canary reweight, promotion, and abort actions
+
+The installable `modelforge` CLI exposes the same operational model for terminal workflows, including health inspection, deployment inventory, prediction, rollback, and canary operations.
 
 ### Model Registry and Artifact Management
 
@@ -268,6 +330,20 @@ result as a workflow artifact. Hosted-runner measurements are validation
 evidence rather than stable performance claims; release-quality numbers should
 be captured on controlled hardware.
 
+#### Latest post-merge CI baseline
+
+| Metric | Result |
+|---|---:|
+| Requests | 200 |
+| Successful | 200 / 200 |
+| Error rate | 0.0% |
+| Throughput | 133.5 requests/s |
+| p50 latency | 137.3 ms |
+| p95 latency | 231.2 ms |
+| p99 latency | 322.8 ms |
+
+This run also smoke-tested the installed CLI, bundled dashboard, seeded stable/canary demo, CLI inference, Docker Compose stack, and external Go runtime.
+
 ### Observability and Readiness
 
 ModelForge exposes serving metrics and system readiness information.
@@ -275,6 +351,23 @@ ModelForge exposes serving metrics and system readiness information.
 The observability layer tracks inference behavior such as prediction execution and cache activity, while readiness checks verify critical service dependencies before reporting the platform ready to serve traffic.
 
 This creates the foundation for measuring reliability and performance rather than assuming them.
+
+## Engineering Documentation
+
+- [Architecture and system invariants](docs/architecture.md)
+- [External runtime contract](docs/runtime-protocol.md)
+- [Recruiter and interview brief](docs/recruiting.md)
+
+Common workflows are available through the root `Makefile`:
+
+```bash
+make install
+make check
+make up
+make demo
+make benchmark
+make down
+```
 
 ## Technology Stack
 
@@ -319,7 +412,7 @@ Reliability and performance characteristics should be demonstrated through tests
 
 ## Testing
 
-The project includes tests across the major system boundaries:
+The post-merge validation checkpoint currently reports **121 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
 
 ```text
 Artifact storage

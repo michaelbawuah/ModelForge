@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 
-from scripts.verify_hosted import verify_hosted_release
+from modelforge.hosted_verify import verify_hosted_release
 
 
 SECURITY_HEADERS = {

@@ -2,13 +2,13 @@
 
 ## 30-second pitch
 
-ModelForge is a reliability-aware ML deployment platform I built to explore the systems problems that appear after model training. It combines a Python/FastAPI control plane, MySQL-backed model and deployment state, framework-specific in-process runtimes, and a standalone Go inference runtime behind a framework-agnostic protocol. The platform supports immutable artifacts, transactional promotion and rollback, weighted canary releases, retries, circuit breakers, automatic stable fallback, Prometheus metrics, S3-compatible artifact storage, multi-tenant workspaces, secure OIDC browser sessions, a public SaaS console, and an authenticated CLI. The current post-merge CI checkpoint passes 138 Python tests and validates the full stack end to end.
+ModelForge is a reliability-aware ML deployment platform I built to explore the systems problems that appear after model training. It combines a Python/FastAPI control plane, MySQL-backed model and deployment state, framework-specific in-process runtimes, and a standalone Go inference runtime behind a framework-agnostic protocol. The platform supports immutable artifacts, transactional promotion and rollback, weighted canary releases, retries, circuit breakers, automatic stable fallback, Prometheus metrics, S3-compatible artifact storage, multi-tenant workspaces, secure OIDC browser sessions, a public SaaS console, an authenticated CLI, production configuration preflight, and a validated Terraform AWS reference deployment. The current post-merge CI checkpoint passes 160 Python tests and validates the full stack end to end.
 
 ## Resume bullets
 
 - Built **ModelForge**, a reliability-aware ML deployment platform in **Python/FastAPI, MySQL, SQLAlchemy, Docker, and Go**, supporting immutable model versioning, deployment lifecycle management, PyTorch/ONNX execution, and framework-independent external runtimes.
 - Designed a framework-agnostic runtime boundary with **bounded retries, exponential backoff, circuit breakers, health checks, Prometheus metrics, weighted canary releases, rollback, and automatic stable fallback** so future ML frameworks can integrate without control-plane rewrites.
-- Shipped a **multi-tenant SaaS console + authenticated CLI + seeded stable/canary demo**, with OIDC/PKCE browser sessions, hashed workspace API keys, strict CSP, and S3-compatible artifacts; validated the production path with **138 passing Python tests** plus end-to-end CI that completed **200/200 requests at 0% error, 133.5 req/s, and 231.2 ms p95 latency** on a GitHub-hosted runner.
+- Shipped a **multi-tenant SaaS console + authenticated CLI + seeded stable/canary demo**, with OIDC/PKCE browser sessions, hashed workspace API keys, strict CSP, S3-compatible artifacts, and a validated AWS ECS/Fargate + RDS + S3 Terraform reference; validated the production path with **160 passing Python tests** plus end-to-end CI that completed **200/200 requests at 0% error, 133.5 req/s, and 231.2 ms p95 latency** on a GitHub-hosted runner.
 
 ## One-line project description
 
@@ -42,7 +42,7 @@ I built ModelForge because training a model is only one piece of an ML system. I
 
 The control plane is FastAPI with MySQL and SQLAlchemy. Models are registered as immutable versions with checksums. Deployments have explicit lifecycle state, and environments have authoritative serving targets. For execution, ModelForge supports in-process runtimes like PyTorch and ONNX, but the important design choice is the external runtime contract. The Go runtime proves the control plane can serve through another language and process without adding Go-specific inference logic to the core.
 
-Then I added reliability: retries, exponential backoff, circuit breakers, health inspection, weighted canaries, promotion, abort, rollback, and automatic stable fallback. I also turned the control plane into a multi-tenant SaaS foundation with workspaces, hashed API keys, OIDC Authorization Code + PKCE browser sessions, CSRF protection, strict CSP, and S3-compatible artifacts. The product has a public landing page, browser console, CLI, fault injection, and benchmark harness. The validated public-product checkpoint passes 138 Python tests and exercises the live Compose stack end to end.
+Then I added reliability: retries, exponential backoff, circuit breakers, health inspection, weighted canaries, promotion, abort, rollback, and automatic stable fallback. I also turned the control plane into a multi-tenant SaaS foundation with workspaces, hashed API keys, OIDC Authorization Code + PKCE browser sessions, CSRF protection, strict CSP, and S3-compatible artifacts. The product has a public landing page, browser console, CLI, fault injection, and benchmark harness. The validated public-product checkpoint passes 160 Python tests and exercises the live Compose stack end to end.
 
 ## Good interview follow-up topics
 
@@ -68,7 +68,7 @@ Then I added reliability: retries, exponential backoff, circuit breakers, health
 
 ## Validated metrics to use carefully
 
-- 138 Python tests passed; 3 skipped in the standard Python CI job.
+- 160 Python tests passed; 3 skipped in the standard Python CI job.
 - Go formatting, tests, and vet checks passed.
 - 200/200 benchmark requests succeeded with 0% error.
 - 133.5 requests/s in the post-merge GitHub-hosted CI smoke run.

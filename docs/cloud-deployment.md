@@ -120,3 +120,14 @@ This keeps framework credentials out of runtime JSON configuration and gives fut
 API replicas are stateless with respect to durable customer data when using managed MySQL and S3-compatible artifacts. The current in-process model cache and circuit-breaker state are replica-local. That is acceptable for the present architecture and is documented rather than hidden.
 
 A later distributed-control-plane milestone can move cache coordination and runtime fleet state behind shared services without changing the framework adapter contract.
+
+
+## AWS reference implementation
+
+A concrete Terraform implementation of this provider-neutral contract lives in
+[`infra/aws`](../infra/aws/README.md). It provisions an ALB edge, private
+ECS/Fargate API and runtime tasks, RDS MySQL, S3 artifacts, Cloud Map runtime
+discovery, Secrets Manager integration, and least-privilege IAM.
+
+The AWS layer is intentionally outside ModelForge core. Replacing AWS with
+another provider changes infrastructure wiring, not the runtime/plugin contract.

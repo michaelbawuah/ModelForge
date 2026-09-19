@@ -72,6 +72,20 @@ jobs:
       - name: Test
         run: python -m pytest -q
 
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: Check Terraform formatting
+        run: terraform -chdir=infra/aws fmt -check -recursive
+      - name: Initialize Terraform
+        run: terraform -chdir=infra/aws init -backend=false
+      - name: Validate Terraform
+        run: terraform -chdir=infra/aws validate
+
   go:
     runs-on: ubuntu-latest
     defaults:
@@ -95,6 +109,7 @@ jobs:
     needs:
       - python
       - go
+      - terraform
     steps:
       - uses: actions/checkout@v4
       - name: Validate Compose configuration

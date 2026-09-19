@@ -10,7 +10,7 @@ Rather than treating model serving as a single `/predict` endpoint, ModelForge t
 
 | Signal | Current validated result |
 |---|---|
-| Python test suite | **138 passed**, 3 skipped |
+| Python test suite | **160 passed**, 3 skipped |
 | Go validation | `gofmt`, `go test ./...`, and `go vet ./...` green |
 | CI benchmark | **200 / 200 successful requests**, 0% errors |
 | Throughput | **133.5 requests/s** |
@@ -386,6 +386,8 @@ This creates the foundation for measuring reliability and performance rather tha
 
 - [Architecture and system invariants](docs/architecture.md)
 - [External runtime contract](docs/runtime-protocol.md)
+- [Public-cloud deployment contract](docs/cloud-deployment.md)
+- [AWS ECS/Fargate reference deployment](infra/aws/README.md)
 - [Recruiter and interview brief](docs/recruiting.md)
 
 Common workflows are available through the root `Makefile`:
@@ -413,6 +415,8 @@ make down
 | External Runtime | Go |
 | Runtime Communication | HTTP / JSON |
 | Metrics | Prometheus |
+| Cloud reference | AWS ECS/Fargate, RDS MySQL, S3, ALB, Cloud Map, Secrets Manager |
+| Infrastructure as Code | Terraform |
 | Testing | pytest, Go testing |
 | Python Quality | Ruff |
 | Go Quality | gofmt, go vet |
@@ -444,7 +448,7 @@ Reliability and performance characteristics should be demonstrated through tests
 
 ## Testing
 
-The post-merge validation checkpoint currently reports **138 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
+The post-merge validation checkpoint currently reports **160 Python tests passed, 3 skipped**, with Go formatting, unit tests, and vet checks green. The project includes tests across the major system boundaries:
 
 ```text
 Artifact storage
@@ -554,7 +558,7 @@ ModelForge is under active development.
 
 Upcoming engineering milestones include:
 
-- public-cloud deployment and managed production configuration
+- hosted AWS release evidence and production smoke validation
 - controlled-hardware performance baselines
 - distributed caching and coordination
 - asynchronous inference and worker execution

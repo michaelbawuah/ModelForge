@@ -19,5 +19,58 @@ services:
       retries: 10
       start_period: 20s
 
+  go-runtime:
+    build:
+      context: ./runtimes/go-runtime
+      dockerfile: Dockerfile
+    container_name: modelforge-go-runtime
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: modelforge-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+pymysql://modelforge:modelforge_dev@mysql:3306/modelforge
+      MODEL_ARTIFACT_ROOT: /var/lib/modelforge/artifacts
+      MODELFORGE_EXTERNAL_RUNTIMES: >-
+        {"go-linear":{"name":"modelforge-go-runtime","base_url":"http://go-runtime:8090","timeout_seconds":2.0}}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      go-runtime:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - alembic upgrade head && exec uvicorn modelforge.api.app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - modelforge_artifacts:/var/lib/modelforge/artifacts
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8000/ready", timeout=2).read()
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
 volumes:
   modelforge_mysql_data:
+  modelforge_artifacts:

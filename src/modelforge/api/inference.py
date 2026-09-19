@@ -13,6 +13,9 @@ from modelforge.schemas.inference import (
 from modelforge.services.deployment_targets import (
     DeploymentTargetNotFoundError,
 )
+from modelforge.services.external_runtime_bootstrap import (
+    create_external_runtime_registry,
+)
 from modelforge.services.external_runtime_registry import (
     ExternalRuntimeRegistry,
 )
@@ -37,7 +40,7 @@ from modelforge.services.runtimes import RuntimeNotFoundError
 router = APIRouter(tags=["inference"])
 
 _runtime_registry = create_runtime_registry()
-_external_runtime_registry = ExternalRuntimeRegistry()
+_external_runtime_registry = create_external_runtime_registry()
 
 _runtime_resolver = RuntimeResolver(
     runtimes=_runtime_registry,

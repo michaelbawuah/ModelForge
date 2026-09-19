@@ -281,6 +281,44 @@ go vet ./...
 
 The repository also includes live integration tests for communication between ModelForge and the standalone Go runtime.
 
+## Running the Full Platform
+
+ModelForge can run locally as a multi-service stack with the Python control
+plane, MySQL metadata store, and Go external runtime:
+
+```bash
+docker compose up --build
+```
+
+The stack exposes:
+
+- ModelForge API: `http://localhost:8000`
+- API readiness: `http://localhost:8000/ready`
+- Prometheus metrics: `http://localhost:8000/metrics`
+- Go runtime: `http://localhost:8090`
+- MySQL: `localhost:3306`
+
+The API boot sequence applies Alembic migrations before accepting traffic.
+Model artifacts are stored in a named Docker volume so immutable artifacts
+survive container restarts.
+
+External runtimes are configured through
+`MODELFORGE_EXTERNAL_RUNTIMES`, a JSON object keyed by framework name:
+
+```json
+{
+  "framework-from-2036": {
+    "name": "future-runtime",
+    "base_url": "http://future-runtime:9000",
+    "timeout_seconds": 5.0
+  }
+}
+```
+
+This keeps framework knowledge outside the control plane. A future framework
+can provide an HTTP runtime implementing ModelForge's protocol and be wired in
+through configuration rather than a core-code change.
+
 ## Running the Go Runtime
 
 From the repository root:
@@ -315,12 +353,10 @@ ModelForge is under active development.
 
 Upcoming engineering milestones include:
 
-- containerizing the control plane and external runtimes
-- Docker Compose multi-service deployment
 - distributed caching and coordination
 - asynchronous inference and worker execution
-- runtime health management
-- request timeouts and resilience policies
+- runtime fleet health management
+- retry, circuit-breaker, and resilience policies
 - canary deployment strategies
 - automated rollback policies
 - load and performance testing

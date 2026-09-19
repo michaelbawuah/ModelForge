@@ -88,6 +88,25 @@ jobs:
         run: python -m pip install -e .
       - name: Start ModelForge stack
         run: docker compose up --build --wait --detach
+      - name: Smoke test installed CLI
+        run: modelforge status > cli-status.json
+      - name: Smoke test bundled dashboard
+        run: >-
+          python -c 'import httpx;
+          r=httpx.get("http://127.0.0.1:8000/dashboard", timeout=10);
+          r.raise_for_status();
+          assert "ModelForge Control Plane" in r.text;
+          open("dashboard-smoke.html","w",encoding="utf-8").write(r.text)'
+      - name: Seed stable and canary product demo
+        run: >-
+          python demo/bootstrap_demo.py
+          --environment ci-demo
+          --weight 20
+          > demo-bootstrap.json
+      - name: Exercise CLI against seeded demo
+        run: |
+          modelforge deployments --environment ci-demo > cli-deployments.json
+          modelforge predict ci-demo 10 > cli-prediction.json
       - name: Bootstrap external benchmark deployment
         run: >-
           python benchmarks/bootstrap_external.py
@@ -112,6 +131,11 @@ jobs:
           path: |
             benchmark-bootstrap.json
             benchmark-results.json
+            cli-status.json
+            cli-deployments.json
+            cli-prediction.json
+            demo-bootstrap.json
+            dashboard-smoke.html
             compose.log
           if-no-files-found: ignore
       - name: Stop ModelForge stack

@@ -17,7 +17,9 @@ from modelforge.db.session import get_db
 from modelforge.services.auth import (
     CSRF_COOKIE,
     SESSION_COOKIE,
+    Principal,
     auth_mode,
+    get_principal,
     verify_oidc_token,
 )
 from modelforge.services.identity import (
@@ -112,7 +114,7 @@ def browser_login(
     ).strip()
 
     redirect_path = _safe_next_path(next_path)
-    state_value, verifier = create_login_challenge(
+    state_value, verifier, nonce = create_login_challenge(
         session,
         redirect_path=redirect_path,
     )
@@ -123,6 +125,7 @@ def browser_login(
             "redirect_uri": redirect_uri,
             "scope": scope,
             "state": state_value,
+            "nonce": nonce,
             "code_challenge": _pkce_challenge(verifier),
             "code_challenge_method": "S256",
         }
@@ -200,6 +203,12 @@ def browser_callback(
             detail="OIDC ID token verification failed.",
         ) from exc
 
+    if claims.get("nonce") != challenge.nonce:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="OIDC nonce validation failed.",
+        )
+
     subject = str(claims.get("sub") or "").strip()
     if not subject:
         raise HTTPException(
@@ -251,10 +260,12 @@ def browser_callback(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def browser_logout(
     request: Request,
+    principal: Principal = Depends(get_principal),
     session: Session = Depends(get_db),
 ) -> Response:
     """Revoke the current browser session and clear session cookies."""
 
+    _ = principal
     raw_session = request.cookies.get(SESSION_COOKIE, "")
     if raw_session:
         revoke_browser_session(session, raw_session)

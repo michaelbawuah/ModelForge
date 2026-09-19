@@ -55,7 +55,7 @@ class Workspace(Base):
         nullable=False,
     )
 
-    memberships: Mapped[list["WorkspaceMember"]] = relationship(
+    memberships: Mapped[list[WorkspaceMember]] = relationship(
         back_populates="workspace",
         cascade="all, delete-orphan",
     )

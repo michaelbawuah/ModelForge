@@ -270,12 +270,17 @@ Terraform then creates `github_actions_deploy_role_arn`. Its trust policy is
 restricted to:
 
 ```text
-repo:michaelbawuah/ModelForge:environment:production
+repo:michaelbawuah@273423923/ModelForge@1373471661:environment:production
 ```
 
-If this repository is forked or renamed, override `github_repository`. If a
-different protected GitHub environment is used, override
-`github_environment`.
+GitHub repositories created after July 15, 2026 use immutable owner and
+repository IDs in OIDC subjects. This repository was created after that date,
+so the trust policy includes its IDs; the name-only subject would prevent the
+release workflow from assuming the role. If this repository is forked or
+transferred, set `github_repository`, `github_repository_owner_id`, and
+`github_repository_id` to the new repository's name and IDs. For a rename,
+update `github_repository`; its IDs remain the same. If a different protected
+GitHub environment is used, override `github_environment`.
 
 The deploy policy grants only the release-plane permissions required for the
 two ECR repositories, ECS service/task operations, and passing the existing

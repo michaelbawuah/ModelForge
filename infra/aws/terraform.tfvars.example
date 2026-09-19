@@ -16,6 +16,12 @@ oidc_authorization_url = "https://YOUR_IDP/authorize"
 oidc_token_url         = "https://YOUR_IDP/oauth/token"
 oidc_client_id         = "YOUR_CLIENT_ID"
 
+# Optional GitHub Actions release role: use the existing AWS IAM provider ARN
+# for https://token.actions.githubusercontent.com.
+# github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+# For a fork or transfer, also set github_repository,
+# github_repository_owner_id, and github_repository_id.
+
 # Set true for providers requiring a confidential client secret.
 oidc_client_secret_required = false
 

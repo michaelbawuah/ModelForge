@@ -18,7 +18,9 @@ The Python/FastAPI control plane is responsible for:
 5. rollback and automatic canary fallback;
 6. runtime discovery and selection;
 7. cache coordination for in-process runtimes;
-8. retries, circuit breakers, metrics, readiness, and operational APIs.
+8. retries, circuit breakers, metrics, readiness, and operational APIs;
+9. workspace tenancy, user/API-key authorization, and browser-session security;
+10. local or S3-compatible artifact persistence behind a shared storage contract.
 
 The control plane should not need to understand how a framework performs tensor
 operations, builds a graph, schedules kernels, or loads its native model
@@ -120,16 +122,30 @@ External runtime calls are protected by:
 These policies are implemented at the runtime boundary so future frameworks
 inherit the same reliability behavior automatically.
 
+## Tenant and authentication boundary
+
+Hosted ModelForge resolves every customer-owned resource inside a workspace. Models, deployments, deployment targets, canaries, API keys, artifact namespaces, and prediction requests are scoped to that workspace.
+
+Human browser authentication uses OIDC Authorization Code + PKCE. Login state and the PKCE verifier remain server-side, ID tokens are nonce-bound, and the browser receives an opaque HttpOnly session cookie rather than a provider token. Unsafe browser requests require double-submit CSRF proof whose server-side hash is bound to the session.
+
+Automation uses high-entropy workspace API keys. Only a one-way hash and non-secret prefix are stored. Self-hosted installations can retain the default workspace by running with authentication disabled.
+
+## Artifact persistence boundary
+
+ModelForge's registry depends on an artifact-store contract rather than a filesystem path convention. The current implementations support local immutable storage and S3-compatible object storage.
+
+Artifact identity remains SHA-256 verified regardless of backend. In-process runtimes materialize cloud artifacts into a verified local cache before loading them, while registry/deployment semantics remain backend-independent.
+
 ## Product surfaces
 
 ModelForge exposes the same control plane through:
 
+- the public product landing page at `/`;
+- the multi-tenant SaaS console at `/dashboard`;
 - the REST/OpenAPI API;
-- the browser dashboard at `/dashboard`;
-- the `modelforge` CLI.
+- the authenticated `modelforge` CLI.
 
-The dashboard and CLI are API clients. They do not bypass deployment lifecycle
-or runtime resolution.
+The browser console and CLI are API clients. They do not bypass tenant boundaries, deployment lifecycle, artifact verification, or runtime resolution.
 
 ## Current scaling boundary
 

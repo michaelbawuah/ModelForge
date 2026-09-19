@@ -1,12 +1,12 @@
 """API schemas for ModelForge inference."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class PredictionRequest(BaseModel):
-    """Request inference from an environment's active deployment."""
+    """Request inference from an environment's serving target."""
 
     environment: str = Field(min_length=1, max_length=64)
     inputs: Any
@@ -22,3 +22,5 @@ class PredictionResponse(BaseModel):
     model_version: str
     framework: str
     cache_hit: bool
+    traffic_lane: Literal["stable", "canary"]
+    canary_fallback: bool

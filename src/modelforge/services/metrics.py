@@ -39,3 +39,15 @@ EXTERNAL_RUNTIME_CIRCUIT_OPEN = Counter(
     "Requests rejected because an external runtime circuit is open.",
     ("runtime",),
 )
+
+CANARY_TRAFFIC = Counter(
+    "modelforge_canary_traffic_total",
+    "Predictions served by stable and canary traffic lanes.",
+    ("environment", "lane"),
+)
+
+CANARY_AUTOMATIC_ROLLBACKS = Counter(
+    "modelforge_canary_automatic_rollbacks_total",
+    "Canary releases automatically removed after serving failures.",
+    ("environment",),
+)

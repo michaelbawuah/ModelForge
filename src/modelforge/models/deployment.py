@@ -13,6 +13,7 @@ class DeploymentState(StrEnum):
     """Valid lifecycle states for a deployment."""
 
     DEPLOYING = "DEPLOYING"
+    CANARY = "CANARY"
     ACTIVE = "ACTIVE"
     FAILED = "FAILED"
     SUPERSEDED = "SUPERSEDED"

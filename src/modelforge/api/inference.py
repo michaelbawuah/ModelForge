@@ -44,20 +44,14 @@ _inference_service = InferenceService(
 
 
 def get_inference_service() -> InferenceService:
-    """Return the process-local inference service."""
-
     return _inference_service
 
 
 def get_runtime_registry() -> RuntimeRegistry:
-    """Return the process-local in-process runtime registry."""
-
     return _runtime_registry
 
 
 def get_external_runtime_registry() -> ExternalRuntimeRegistry:
-    """Return the process-local external runtime registry."""
-
     return _external_runtime_registry
 
 
@@ -71,8 +65,6 @@ def predict(
     session: Annotated[Session, Depends(get_db)],
     service: Annotated[InferenceService, Depends(get_inference_service)],
 ) -> PredictionResponse:
-    """Serve a prediction from an environment's active deployment."""
-
     try:
         result = service.predict(
             session,
@@ -114,4 +106,6 @@ def predict(
         model_version=result.model_version,
         framework=result.framework,
         cache_hit=result.cache_hit,
+        traffic_lane=result.traffic_lane,
+        canary_fallback=result.canary_fallback,
     )

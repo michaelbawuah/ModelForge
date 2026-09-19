@@ -20,6 +20,24 @@ class DeploymentFailure(BaseModel):
     reason: str = Field(min_length=1, max_length=2048)
 
 
+class CanaryStart(BaseModel):
+    """Start canary traffic for a DEPLOYING deployment."""
+
+    weight: int = Field(ge=1, le=99)
+
+
+class CanaryWeightUpdate(BaseModel):
+    """Change the percentage of traffic routed to a canary."""
+
+    weight: int = Field(ge=1, le=99)
+
+
+class CanaryAbort(BaseModel):
+    """Reason for aborting a canary release."""
+
+    reason: str = Field(min_length=1, max_length=2048)
+
+
 class DeploymentRead(BaseModel):
     """Public representation of a deployment."""
 

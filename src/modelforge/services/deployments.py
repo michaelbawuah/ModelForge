@@ -32,8 +32,16 @@ class ActiveDeploymentNotFoundError(Exception):
 VALID_TRANSITIONS: dict[DeploymentState, frozenset[DeploymentState]] = {
     DeploymentState.DEPLOYING: frozenset(
         {
+            DeploymentState.CANARY,
             DeploymentState.ACTIVE,
             DeploymentState.FAILED,
+        }
+    ),
+    DeploymentState.CANARY: frozenset(
+        {
+            DeploymentState.ACTIVE,
+            DeploymentState.FAILED,
+            DeploymentState.SUPERSEDED,
         }
     ),
     DeploymentState.ACTIVE: frozenset(
@@ -55,10 +63,8 @@ def _normalize_environment(environment: str) -> str:
     """Normalize environment names used as deployment identities."""
 
     normalized = environment.strip().lower()
-
     if not normalized:
         raise ValueError("environment cannot be empty.")
-
     return normalized
 
 
@@ -71,7 +77,6 @@ def create_deployment(
     """Create a deployment in the DEPLOYING state."""
 
     model_version = session.get(ModelVersion, model_version_id)
-
     if model_version is None:
         raise ModelVersionNotFoundError(model_version_id)
 
@@ -82,7 +87,6 @@ def create_deployment(
         environment=normalized_environment,
         state=DeploymentState.DEPLOYING.value,
     )
-
     session.add(deployment)
 
     try:
@@ -97,17 +101,12 @@ def create_deployment(
     return deployment
 
 
-def get_deployment(
-    session: Session,
-    deployment_id: int,
-) -> Deployment:
+def get_deployment(session: Session, deployment_id: int) -> Deployment:
     """Return a deployment or raise when it does not exist."""
 
     deployment = session.get(Deployment, deployment_id)
-
     if deployment is None:
         raise DeploymentNotFoundError(deployment_id)
-
     return deployment
 
 
@@ -126,7 +125,6 @@ def list_deployments(
         )
 
     statement = statement.order_by(Deployment.id)
-
     return list(session.scalars(statement))
 
 
@@ -153,22 +151,17 @@ def transition_deployment(
             raise ValueError(
                 "A failure reason is required when marking a deployment FAILED."
             )
-
         deployment.failure_reason = failure_reason.strip()
-
     elif failure_reason is not None:
         raise ValueError(
             "failure_reason may only be supplied for a FAILED deployment."
         )
-
     else:
         deployment.failure_reason = None
 
     deployment.state = target_state.value
-
     session.commit()
     session.refresh(deployment)
-
     return deployment
 
 
@@ -180,12 +173,11 @@ def promote_deployment(
     """Atomically make a DEPLOYING deployment active in its environment."""
 
     try:
-        target_statement = (
+        target = session.scalar(
             select(Deployment)
             .where(Deployment.id == deployment_id)
             .with_for_update()
         )
-        target = session.scalar(target_statement)
 
         if target is None:
             raise DeploymentNotFoundError(deployment_id)
@@ -195,7 +187,7 @@ def promote_deployment(
                 f"Deployment {deployment_id} must be DEPLOYING before promotion."
             )
 
-        active_statement = (
+        current_active = session.scalar(
             select(Deployment)
             .where(
                 Deployment.environment == target.environment,
@@ -205,16 +197,11 @@ def promote_deployment(
             .with_for_update()
         )
 
-        current_active = session.scalar(active_statement)
-
         if current_active is not None:
             current_active.state = DeploymentState.SUPERSEDED.value
 
         target.state = DeploymentState.ACTIVE.value
         target.failure_reason = None
-
-        # Flush the deployment state changes before updating the authoritative
-        # environment pointer. Both operations remain inside this transaction.
         session.flush()
 
         set_deployment_target(
@@ -225,7 +212,6 @@ def promote_deployment(
 
         session.commit()
         session.refresh(target)
-
         return target
 
     except Exception:
@@ -241,12 +227,11 @@ def rollback_deployment(
     """Atomically restore a superseded deployment to ACTIVE."""
 
     try:
-        target_statement = (
+        target = session.scalar(
             select(Deployment)
             .where(Deployment.id == deployment_id)
             .with_for_update()
         )
-        target = session.scalar(target_statement)
 
         if target is None:
             raise DeploymentNotFoundError(deployment_id)
@@ -256,7 +241,7 @@ def rollback_deployment(
                 f"Deployment {deployment_id} must be SUPERSEDED before rollback."
             )
 
-        active_statement = (
+        current_active = session.scalar(
             select(Deployment)
             .where(
                 Deployment.environment == target.environment,
@@ -266,16 +251,12 @@ def rollback_deployment(
             .with_for_update()
         )
 
-        current_active = session.scalar(active_statement)
-
         if current_active is None:
             raise ActiveDeploymentNotFoundError(target.environment)
 
         current_active.state = DeploymentState.SUPERSEDED.value
         target.state = DeploymentState.ACTIVE.value
         target.failure_reason = None
-
-        # The deployment swap and target-pointer update are committed together.
         session.flush()
 
         set_deployment_target(
@@ -286,7 +267,6 @@ def rollback_deployment(
 
         session.commit()
         session.refresh(target)
-
         return target
 
     except Exception:

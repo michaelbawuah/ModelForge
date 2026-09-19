@@ -53,7 +53,7 @@ jobs:
           role-session-name: modelforge-${{ github.run_id }}
 
       - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2.1.7
+        uses: aws-actions/amazon-ecr-login@v2.1.6
 
       - name: Resolve release names
         id: release

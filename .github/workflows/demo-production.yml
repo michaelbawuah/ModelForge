@@ -1,0 +1,94 @@
+name: Production Demo Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: ModelForge deployment environment used for the recruiter demo
+        required: true
+        default: recruiter-demo
+        type: string
+      canary_weight:
+        description: Canary traffic percentage
+        required: true
+        default: "25"
+        type: string
+      samples:
+        description: Minimum requests sampled in each canary phase
+        required: true
+        default: "60"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modelforge-production-demo
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      MODELFORGE_PUBLIC_URL: ${{ vars.MODELFORGE_PUBLIC_URL }}
+      MODELFORGE_API_KEY: ${{ secrets.MODELFORGE_DEMO_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Validate proof configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${MODELFORGE_PUBLIC_URL:?Set MODELFORGE_PUBLIC_URL in the production environment.}"
+          : "${MODELFORGE_API_KEY:?Set MODELFORGE_DEMO_API_KEY in the production environment.}"
+
+          if [[ "${MODELFORGE_PUBLIC_URL}" != https://* ]]; then
+            echo "MODELFORGE_PUBLIC_URL must use HTTPS." >&2
+            exit 1
+          fi
+
+      - name: Install ModelForge proof client
+        run: python -m pip install -e .
+
+      - name: Verify hosted public edge
+        run: |
+          mkdir -p evidence
+          python demo/verify_public.py \
+            --output evidence/public-verification.json
+
+      - name: Run hosted release-safety proof
+        run: |
+          python demo/hosted_lifecycle.py \
+            --environment "${{ inputs.environment }}" \
+            --weight "${{ inputs.canary_weight }}" \
+            --samples "${{ inputs.samples }}" \
+            --output evidence/hosted-demo.json \
+            --markdown evidence/hosted-demo.md
+
+      - name: Install screenshot browser
+        run: |
+          python -m pip install "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+
+      - name: Capture recruiter-facing screenshots
+        run: python demo/capture_screenshots.py --output-dir evidence
+
+      - name: Publish proof summary
+        shell: bash
+        run: cat evidence/hosted-demo.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload hosted proof evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelforge-production-demo-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30

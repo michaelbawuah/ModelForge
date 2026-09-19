@@ -159,12 +159,23 @@ jobs:
               json.dumps(payload, indent=2)
           )
           PY
-      - name: Seed stable and canary product demo
+      - name: Verify public product contract locally
         run: >-
-          python demo/bootstrap_demo.py
+          python demo/verify_public.py
+          --base-url http://127.0.0.1:8000
+          --allow-http
+          --allow-auth-disabled
+          --output local-public-verification.json
+      - name: Run complete release-safety demo proof
+        run: >-
+          python demo/hosted_lifecycle.py
+          --base-url http://127.0.0.1:8000
+          --allow-self-hosted
           --environment ci-demo
-          --weight 20
-          > demo-bootstrap.json
+          --weight 25
+          --samples 40
+          --output hosted-demo-proof.json
+          --markdown hosted-demo-proof.md
       - name: Exercise CLI against seeded demo
         run: |
           modelforge deployments --environment ci-demo > cli-deployments.json
@@ -196,7 +207,9 @@ jobs:
             cli-status.json
             cli-deployments.json
             cli-prediction.json
-            demo-bootstrap.json
+            local-public-verification.json
+            hosted-demo-proof.json
+            hosted-demo-proof.md
             landing-smoke.html
             dashboard-smoke.html
             auth-config.json

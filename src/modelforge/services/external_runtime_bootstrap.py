@@ -10,28 +10,23 @@ from modelforge.services.external_runtime_registry import ExternalRuntimeRegistr
 from modelforge.services.external_runtimes import ExternalRuntimeSpec
 
 EXTERNAL_RUNTIMES_ENV = "MODELFORGE_EXTERNAL_RUNTIMES"
-_ALLOWED_FIELDS = frozenset({"name", "base_url", "timeout_seconds"})
+_ALLOWED_FIELDS = frozenset(
+    {
+        "name",
+        "base_url",
+        "timeout_seconds",
+        "max_retries",
+        "retry_backoff_seconds",
+        "circuit_failure_threshold",
+        "circuit_reset_seconds",
+    }
+)
 
 
 def create_external_runtime_registry(
     configuration: str | None = None,
 ) -> ExternalRuntimeRegistry:
-    """Build an external runtime registry from JSON configuration.
-
-    The configuration is a mapping from framework identifier to connection
-    settings. Keeping this mapping outside ModelForge core lets new frameworks
-    integrate without adding framework-specific branches to the control plane.
-
-    Example::
-
-        {
-          "go-linear": {
-            "name": "modelforge-go-runtime",
-            "base_url": "http://go-runtime:8090",
-            "timeout_seconds": 2.0
-          }
-        }
-    """
+    """Build an external runtime registry from JSON configuration."""
 
     registry = ExternalRuntimeRegistry()
     raw = configuration
@@ -94,20 +89,55 @@ def _register_runtime(
             f"External runtime '{framework}' requires a non-empty name."
         )
 
-    timeout_seconds = settings.get("timeout_seconds", 10.0)
-    if (
-        isinstance(timeout_seconds, bool)
-        or not isinstance(timeout_seconds, (int, float))
-    ):
-        raise TypeError(
-            f"External runtime '{framework}' timeout_seconds must be numeric."
-        )
+    timeout_seconds = _float_setting(settings, "timeout_seconds", 10.0)
 
     registry.register(
         framework,
         ExternalRuntimeSpec(
             name=name,
             base_url=base_url,
-            timeout_seconds=float(timeout_seconds),
+            timeout_seconds=timeout_seconds,
+            max_retries=_integer_setting(settings, "max_retries", 1),
+            retry_backoff_seconds=_float_setting(
+                settings,
+                "retry_backoff_seconds",
+                0.05,
+            ),
+            circuit_failure_threshold=_integer_setting(
+                settings,
+                "circuit_failure_threshold",
+                3,
+            ),
+            circuit_reset_seconds=_float_setting(
+                settings,
+                "circuit_reset_seconds",
+                30.0,
+            ),
         ),
     )
+
+
+def _integer_setting(
+    settings: dict[str, Any],
+    name: str,
+    default: int,
+) -> int:
+    """Read an integer runtime setting without accepting booleans."""
+
+    value = settings.get(name, default)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} must be an integer.")
+    return value
+
+
+def _float_setting(
+    settings: dict[str, Any],
+    name: str,
+    default: float,
+) -> float:
+    """Read a numeric runtime setting without accepting booleans."""
+
+    value = settings.get(name, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be numeric.")
+    return float(value)

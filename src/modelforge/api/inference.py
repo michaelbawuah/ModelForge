@@ -6,19 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from modelforge.db.session import get_db
-from modelforge.schemas.inference import (
-    PredictionRequest,
-    PredictionResponse,
-)
-from modelforge.services.deployment_targets import (
-    DeploymentTargetNotFoundError,
-)
+from modelforge.schemas.inference import PredictionRequest, PredictionResponse
+from modelforge.services.deployment_targets import DeploymentTargetNotFoundError
 from modelforge.services.external_runtime_bootstrap import (
     create_external_runtime_registry,
 )
-from modelforge.services.external_runtime_registry import (
-    ExternalRuntimeRegistry,
-)
+from modelforge.services.external_runtime_registry import ExternalRuntimeRegistry
 from modelforge.services.external_runtimes import (
     ExternalRuntimePredictionError,
     ExternalRuntimeProtocolError,
@@ -31,24 +24,19 @@ from modelforge.services.inference import (
     InferenceService,
 )
 from modelforge.services.model_cache import ModelCache
-from modelforge.services.runtime_bootstrap import (
-    create_runtime_registry,
-)
+from modelforge.services.runtime_bootstrap import create_runtime_registry
 from modelforge.services.runtime_resolver import RuntimeResolver
-from modelforge.services.runtimes import RuntimeNotFoundError
+from modelforge.services.runtimes import RuntimeNotFoundError, RuntimeRegistry
 
 router = APIRouter(tags=["inference"])
 
 _runtime_registry = create_runtime_registry()
 _external_runtime_registry = create_external_runtime_registry()
-
 _runtime_resolver = RuntimeResolver(
     runtimes=_runtime_registry,
     external_runtimes=_external_runtime_registry,
 )
-
 _model_cache = ModelCache()
-
 _inference_service = InferenceService(
     resolver=_runtime_resolver,
     cache=_model_cache,
@@ -59,6 +47,12 @@ def get_inference_service() -> InferenceService:
     """Return the process-local inference service."""
 
     return _inference_service
+
+
+def get_runtime_registry() -> RuntimeRegistry:
+    """Return the process-local in-process runtime registry."""
+
+    return _runtime_registry
 
 
 def get_external_runtime_registry() -> ExternalRuntimeRegistry:
@@ -75,10 +69,7 @@ def get_external_runtime_registry() -> ExternalRuntimeRegistry:
 def predict(
     request: PredictionRequest,
     session: Annotated[Session, Depends(get_db)],
-    service: Annotated[
-        InferenceService,
-        Depends(get_inference_service),
-    ],
+    service: Annotated[InferenceService, Depends(get_inference_service)],
 ) -> PredictionResponse:
     """Serve a prediction from an environment's active deployment."""
 

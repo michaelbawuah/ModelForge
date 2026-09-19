@@ -59,7 +59,7 @@ You can run the verifier locally without changing data:
 MODELFORGE_URL=https://YOUR_PUBLIC_HOST \
 MODELFORGE_API_KEY=mf_live_... \
 MODELFORGE_WORKSPACE=YOUR_WORKSPACE_SLUG \
-python scripts/verify_hosted.py
+python -m modelforge.hosted_verify
 ~~~
 
 It checks HTTPS, health/readiness, OIDC mode, HSTS, strict CSP,
@@ -77,7 +77,7 @@ In GitHub:
 4. Keep the default serving environment or choose another isolated name.
 5. Run it.
 
-The workflow first runs scripts/verify_hosted.py, then executes the same
+The workflow first runs the packaged hosted verifier, then executes the same
 full-lifecycle proof used by local CI:
 
 ~~~text

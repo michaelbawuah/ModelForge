@@ -20,7 +20,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column("models", sa.Column("workspace_id", sa.Integer(), nullable=True))
     op.execute("UPDATE models SET workspace_id = 1")
-    op.alter_column("models", "workspace_id", nullable=False)
+    op.alter_column(\n        "models",\n        "workspace_id",\n        existing_type=sa.Integer(),\n        nullable=False,\n    )
     op.create_foreign_key(
         "fk_models_workspace_id",
         "models",
@@ -43,7 +43,7 @@ def upgrade() -> None:
         sa.Column("workspace_id", sa.Integer(), nullable=True),
     )
     op.execute("UPDATE deployments SET workspace_id = 1")
-    op.alter_column("deployments", "workspace_id", nullable=False)
+    op.alter_column(\n        "deployments",\n        "workspace_id",\n        existing_type=sa.Integer(),\n        nullable=False,\n    )
     op.create_foreign_key(
         "fk_deployments_workspace_id",
         "deployments",

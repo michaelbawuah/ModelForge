@@ -18,9 +18,17 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("models", sa.Column("workspace_id", sa.Integer(), nullable=True))
+    op.add_column(
+        "models",
+        sa.Column("workspace_id", sa.Integer(), nullable=True),
+    )
     op.execute("UPDATE models SET workspace_id = 1")
-    op.alter_column(\n        "models",\n        "workspace_id",\n        existing_type=sa.Integer(),\n        nullable=False,\n    )
+    op.alter_column(
+        "models",
+        "workspace_id",
+        existing_type=sa.Integer(),
+        nullable=False,
+    )
     op.create_foreign_key(
         "fk_models_workspace_id",
         "models",
@@ -43,7 +51,12 @@ def upgrade() -> None:
         sa.Column("workspace_id", sa.Integer(), nullable=True),
     )
     op.execute("UPDATE deployments SET workspace_id = 1")
-    op.alter_column(\n        "deployments",\n        "workspace_id",\n        existing_type=sa.Integer(),\n        nullable=False,\n    )
+    op.alter_column(
+        "deployments",
+        "workspace_id",
+        existing_type=sa.Integer(),
+        nullable=False,
+    )
     op.create_foreign_key(
         "fk_deployments_workspace_id",
         "deployments",
@@ -89,30 +102,39 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "canary_weight >= 0 AND canary_weight <= 100",
-            name="ck_deployment_targets_canary_weight",
+            name="ck_deployment_targets_canary_weight_v2",
         ),
         sa.ForeignKeyConstraint(
             ["active_deployment_id"],
             ["deployments.id"],
+            name="fk_deployment_targets_active_deployment_id_v2",
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["canary_deployment_id"],
             ["deployments.id"],
+            name="fk_deployment_targets_canary_deployment_id_v2",
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["workspace_id"],
             ["workspaces.id"],
+            name="fk_deployment_targets_workspace_id_v2",
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("active_deployment_id"),
-        sa.UniqueConstraint("canary_deployment_id"),
+        sa.UniqueConstraint(
+            "active_deployment_id",
+            name="uq_deployment_targets_active_deployment_id_v2",
+        ),
+        sa.UniqueConstraint(
+            "canary_deployment_id",
+            name="uq_deployment_targets_canary_deployment_id_v2",
+        ),
         sa.UniqueConstraint(
             "workspace_id",
             "environment",
-            name="uq_deployment_targets_workspace_environment",
+            name="uq_deployment_targets_workspace_environment_v2",
         ),
     )
     op.execute(

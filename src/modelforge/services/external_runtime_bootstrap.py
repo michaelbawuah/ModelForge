@@ -50,7 +50,7 @@ def create_external_runtime_registry(
         ) from exc
 
     if not isinstance(payload, dict):
-        raise ValueError(
+        raise TypeError(
             f"{EXTERNAL_RUNTIMES_ENV} must be a JSON object keyed by framework."
         )
 
@@ -71,7 +71,7 @@ def _register_runtime(
         raise ValueError("External runtime framework names must be non-empty strings.")
 
     if not isinstance(settings, dict):
-        raise ValueError(
+        raise TypeError(
             f"External runtime configuration for '{framework}' must be an object."
         )
 
@@ -99,7 +99,7 @@ def _register_runtime(
         isinstance(timeout_seconds, bool)
         or not isinstance(timeout_seconds, (int, float))
     ):
-        raise ValueError(
+        raise TypeError(
             f"External runtime '{framework}' timeout_seconds must be numeric."
         )
 

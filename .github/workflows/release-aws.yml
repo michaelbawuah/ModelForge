@@ -100,6 +100,36 @@ jobs:
             echo "runtime_image=${RUNTIME_REPO_URI}:${TAG}"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Require activated ECS services
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CLUSTER="${{ steps.release.outputs.cluster }}"
+          API_SERVICE="${{ steps.release.outputs.api_service }}"
+          RUNTIME_SERVICE="${{ steps.release.outputs.runtime_service }}"
+
+          API_DESIRED="$(aws ecs describe-services \
+            --cluster "${CLUSTER}" \
+            --services "${API_SERVICE}" \
+            --query 'services[0].desiredCount' \
+            --output text)"
+          RUNTIME_DESIRED="$(aws ecs describe-services \
+            --cluster "${CLUSTER}" \
+            --services "${RUNTIME_SERVICE}" \
+            --query 'services[0].desiredCount' \
+            --output text)"
+
+          if [[ "${API_DESIRED}" == "None" || "${RUNTIME_DESIRED}" == "None" ]]; then
+            echo "ModelForge ECS services do not exist in cluster ${CLUSTER}." >&2
+            exit 1
+          fi
+
+          if (( API_DESIRED < 1 || RUNTIME_DESIRED < 1 )); then
+            echo "Production services are inactive. Apply Terraform with activate_services=true before releasing." >&2
+            exit 1
+          fi
+
       - name: Build and push immutable API image
         shell: bash
         run: |
@@ -250,13 +280,44 @@ jobs:
         run: |
           set -u
 
+          CLUSTER="${{ steps.release.outputs.cluster }}"
+          API_SERVICE="${{ steps.release.outputs.api_service }}"
+          RUNTIME_SERVICE="${{ steps.release.outputs.runtime_service }}"
+          ROLLBACK_FAILED=0
+
           if [[ "${MODELFORGE_API_UPDATED:-false}" == "true" ]]; then
-            aws ecs update-service               --cluster "${{ steps.release.outputs.cluster }}"               --service "${{ steps.release.outputs.api_service }}"               --task-definition "${{ steps.snapshot.outputs.api_task }}"               --force-new-deployment               >/dev/null || true
+            aws ecs update-service \
+              --cluster "${CLUSTER}" \
+              --service "${API_SERVICE}" \
+              --task-definition "${{ steps.snapshot.outputs.api_task }}" \
+              --force-new-deployment \
+              >/dev/null || ROLLBACK_FAILED=1
           fi
 
           if [[ "${MODELFORGE_RUNTIME_UPDATED:-false}" == "true" ]]; then
-            aws ecs update-service               --cluster "${{ steps.release.outputs.cluster }}"               --service "${{ steps.release.outputs.runtime_service }}"               --task-definition "${{ steps.snapshot.outputs.runtime_task }}"               --force-new-deployment               >/dev/null || true
+            aws ecs update-service \
+              --cluster "${CLUSTER}" \
+              --service "${RUNTIME_SERVICE}" \
+              --task-definition "${{ steps.snapshot.outputs.runtime_task }}" \
+              --force-new-deployment \
+              >/dev/null || ROLLBACK_FAILED=1
           fi
+
+          if [[ "${MODELFORGE_API_UPDATED:-false}" == "true" ]]; then
+            aws ecs wait services-stable \
+              --cluster "${CLUSTER}" \
+              --services "${API_SERVICE}" \
+              || ROLLBACK_FAILED=1
+          fi
+
+          if [[ "${MODELFORGE_RUNTIME_UPDATED:-false}" == "true" ]]; then
+            aws ecs wait services-stable \
+              --cluster "${CLUSTER}" \
+              --services "${RUNTIME_SERVICE}" \
+              || ROLLBACK_FAILED=1
+          fi
+
+          exit "${ROLLBACK_FAILED}"
 
       - name: Upload release evidence
         if: always()

@@ -10,7 +10,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from modelforge.db.session import get_db
-from modelforge.models.identity import User, Workspace
+from modelforge.models.identity import Workspace
 from modelforge.services.identity import (
     ApiKeyAuthenticationError,
     WorkspaceNotFoundError,

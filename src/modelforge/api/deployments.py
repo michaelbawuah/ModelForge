@@ -7,11 +7,25 @@ from sqlalchemy.orm import Session
 
 from modelforge.db.session import get_db
 from modelforge.models.deployment import Deployment, DeploymentState
+from modelforge.models.deployment_target import DeploymentTarget
+from modelforge.schemas.deployment_targets import DeploymentTargetRead
 from modelforge.schemas.deployments import (
+    CanaryAbort,
+    CanaryStart,
+    CanaryWeightUpdate,
     DeploymentCreate,
     DeploymentFailure,
     DeploymentRead,
 )
+from modelforge.services.canaries import (
+    CanaryAlreadyExistsError,
+    CanaryNotConfiguredError,
+    abort_canary,
+    promote_canary,
+    start_canary,
+    update_canary_weight,
+)
+from modelforge.services.deployment_targets import DeploymentTargetNotFoundError
 from modelforge.services.deployments import (
     ActiveDeploymentNotFoundError,
     DeploymentAlreadyExistsError,
@@ -54,8 +68,6 @@ def create_registered_deployment(
     payload: DeploymentCreate,
     session: DatabaseSession,
 ) -> Deployment:
-    """Create a deployment for a registered model version."""
-
     try:
         return create_deployment(
             session,
@@ -84,8 +96,6 @@ def get_deployments(
     session: DatabaseSession,
     environment: Annotated[str | None, Query()] = None,
 ) -> list[Deployment]:
-    """List deployments, optionally filtered by environment."""
-
     try:
         return list_deployments(session, environment=environment)
     except ValueError as exc:
@@ -100,8 +110,6 @@ def get_registered_deployment(
     deployment_id: int,
     session: DatabaseSession,
 ) -> Deployment:
-    """Retrieve one deployment."""
-
     try:
         return get_deployment(session, deployment_id)
     except DeploymentNotFoundError as exc:
@@ -113,13 +121,8 @@ def promote_registered_deployment(
     deployment_id: int,
     session: DatabaseSession,
 ) -> Deployment:
-    """Promote a DEPLOYING deployment to ACTIVE."""
-
     try:
-        return promote_deployment(
-            session,
-            deployment_id=deployment_id,
-        )
+        return promote_deployment(session, deployment_id=deployment_id)
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
     except InvalidDeploymentTransitionError as exc:
@@ -132,8 +135,6 @@ def fail_registered_deployment(
     payload: DeploymentFailure,
     session: DatabaseSession,
 ) -> Deployment:
-    """Mark a deployment FAILED with a diagnostic reason."""
-
     try:
         return transition_deployment(
             session,
@@ -157,17 +158,102 @@ def rollback_registered_deployment(
     deployment_id: int,
     session: DatabaseSession,
 ) -> Deployment:
-    """Restore a SUPERSEDED deployment to ACTIVE."""
-
     try:
-        return rollback_deployment(
-            session,
-            deployment_id=deployment_id,
-        )
+        return rollback_deployment(session, deployment_id=deployment_id)
     except DeploymentNotFoundError as exc:
         raise _not_found(deployment_id) from exc
     except (
         ActiveDeploymentNotFoundError,
         InvalidDeploymentTransitionError,
+    ) as exc:
+        raise _conflict(str(exc)) from exc
+
+
+@router.post("/{deployment_id}/canary", response_model=DeploymentRead)
+def start_registered_canary(
+    deployment_id: int,
+    payload: CanaryStart,
+    session: DatabaseSession,
+) -> Deployment:
+    try:
+        return start_canary(
+            session,
+            deployment_id=deployment_id,
+            weight=payload.weight,
+        )
+    except DeploymentNotFoundError as exc:
+        raise _not_found(deployment_id) from exc
+    except (
+        CanaryAlreadyExistsError,
+        DeploymentTargetNotFoundError,
+        InvalidDeploymentTransitionError,
+    ) as exc:
+        raise _conflict(str(exc)) from exc
+
+
+@router.patch(
+    "/{deployment_id}/canary",
+    response_model=DeploymentTargetRead,
+)
+def change_registered_canary_weight(
+    deployment_id: int,
+    payload: CanaryWeightUpdate,
+    session: DatabaseSession,
+) -> DeploymentTarget:
+    try:
+        return update_canary_weight(
+            session,
+            deployment_id=deployment_id,
+            weight=payload.weight,
+        )
+    except DeploymentNotFoundError as exc:
+        raise _not_found(deployment_id) from exc
+    except (
+        CanaryNotConfiguredError,
+        DeploymentTargetNotFoundError,
+    ) as exc:
+        raise _conflict(str(exc)) from exc
+
+
+@router.post(
+    "/{deployment_id}/canary/promote",
+    response_model=DeploymentRead,
+)
+def promote_registered_canary(
+    deployment_id: int,
+    session: DatabaseSession,
+) -> Deployment:
+    try:
+        return promote_canary(session, deployment_id=deployment_id)
+    except DeploymentNotFoundError as exc:
+        raise _not_found(deployment_id) from exc
+    except (
+        CanaryNotConfiguredError,
+        DeploymentTargetNotFoundError,
+        InvalidDeploymentTransitionError,
+    ) as exc:
+        raise _conflict(str(exc)) from exc
+
+
+@router.post(
+    "/{deployment_id}/canary/abort",
+    response_model=DeploymentRead,
+)
+def abort_registered_canary(
+    deployment_id: int,
+    payload: CanaryAbort,
+    session: DatabaseSession,
+) -> Deployment:
+    try:
+        return abort_canary(
+            session,
+            deployment_id=deployment_id,
+            reason=payload.reason,
+        )
+    except DeploymentNotFoundError as exc:
+        raise _not_found(deployment_id) from exc
+    except (
+        CanaryNotConfiguredError,
+        DeploymentTargetNotFoundError,
     ) as exc:
         raise _conflict(str(exc)) from exc

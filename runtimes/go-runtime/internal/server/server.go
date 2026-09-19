@@ -5,19 +5,37 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
+	"time"
 
 	runtimeengine "github.com/michaelbawuah/ModelForge/runtimes/go-runtime/internal/runtime"
 )
 
+type FaultConfig struct {
+	FailEvery uint64
+	Delay     time.Duration
+}
+
 type Server struct {
-	runtime *runtimeengine.Runtime
-	logger  *slog.Logger
+	runtime      *runtimeengine.Runtime
+	logger       *slog.Logger
+	faults       FaultConfig
+	requestCount atomic.Uint64
 }
 
 func New(runtime *runtimeengine.Runtime, logger *slog.Logger) *Server {
+	return NewWithFaults(runtime, logger, FaultConfig{})
+}
+
+func NewWithFaults(
+	runtime *runtimeengine.Runtime,
+	logger *slog.Logger,
+	faults FaultConfig,
+) *Server {
 	return &Server{
 		runtime: runtime,
 		logger:  logger,
+		faults:  faults,
 	}
 }
 
@@ -47,6 +65,22 @@ func (s *Server) predict(w http.ResponseWriter, r *http.Request) {
 
 	if err := decoder.Decode(&request); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid prediction request")
+		return
+	}
+
+	requestNumber := s.requestCount.Add(1)
+
+	if s.faults.Delay > 0 {
+		time.Sleep(s.faults.Delay)
+	}
+
+	if s.faults.FailEvery > 0 && requestNumber%s.faults.FailEvery == 0 {
+		s.logger.Warn(
+			"injected runtime failure",
+			"request_number", requestNumber,
+			"fail_every", s.faults.FailEvery,
+		)
+		writeError(w, http.StatusServiceUnavailable, "injected runtime failure")
 		return
 	}
 

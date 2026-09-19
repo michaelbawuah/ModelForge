@@ -33,16 +33,12 @@ class ExternalRuntimeRegistry:
 
         if normalized in self._runtimes:
             raise ExternalRuntimeAlreadyRegisteredError(
-                f"External runtime already registered for "
-                f"framework '{normalized}'."
+                f"External runtime already registered for framework '{normalized}'."
             )
 
         self._runtimes[normalized] = ExternalRuntimeClient(spec)
 
-    def get(
-        self,
-        framework: str,
-    ) -> ExternalRuntimeClient:
+    def get(self, framework: str) -> ExternalRuntimeClient:
         """Return the external runtime registered for a framework."""
 
         normalized = self._normalize(framework)
@@ -51,8 +47,7 @@ class ExternalRuntimeRegistry:
             return self._runtimes[normalized]
         except KeyError as exc:
             raise ExternalRuntimeNotFoundError(
-                f"No external runtime is registered for "
-                f"framework '{framework}'."
+                f"No external runtime is registered for framework '{framework}'."
             ) from exc
 
     def contains(self, framework: str) -> bool:
@@ -65,11 +60,17 @@ class ExternalRuntimeRegistry:
 
         return tuple(sorted(self._runtimes))
 
+    def items(self) -> tuple[tuple[str, ExternalRuntimeClient], ...]:
+        """Return registered framework/client pairs in deterministic order."""
+
+        return tuple(
+            (framework, self._runtimes[framework])
+            for framework in sorted(self._runtimes)
+        )
+
     @staticmethod
     def _normalize(framework: str) -> str:
         normalized = framework.strip().lower()
-
         if not normalized:
             raise ValueError("framework cannot be empty.")
-
         return normalized

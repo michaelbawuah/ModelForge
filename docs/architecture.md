@@ -1,0 +1,141 @@
+# ModelForge Architecture
+
+ModelForge separates **deployment orchestration** from **model execution**.
+
+That separation is the central architectural decision in the project. The
+control plane owns model identity, artifact integrity, deployment state,
+traffic selection, observability, and rollback. Runtimes own framework-specific
+loading and prediction.
+
+## Control-plane responsibilities
+
+The Python/FastAPI control plane is responsible for:
+
+1. model registration and immutable version identity;
+2. artifact storage and SHA-256 integrity verification;
+3. deployment lifecycle state and authoritative environment targets;
+4. stable/canary traffic selection;
+5. rollback and automatic canary fallback;
+6. runtime discovery and selection;
+7. cache coordination for in-process runtimes;
+8. retries, circuit breakers, metrics, readiness, and operational APIs.
+
+The control plane should not need to understand how a framework performs tensor
+operations, builds a graph, schedules kernels, or loads its native model
+format.
+
+## Runtime modes
+
+ModelForge has two execution modes.
+
+### In-process runtimes
+
+An in-process runtime implements the Python runtime interface and is appropriate
+when the framework can safely share the control-plane process.
+
+Current examples include the built-in JSON runtime, PyTorch, and ONNX Runtime.
+
+Optional framework dependencies are discovered at startup. ModelForge core can
+boot without PyTorch or ONNX installed.
+
+### External runtimes
+
+An external runtime is a separate HTTP service. It can be implemented in any
+language and packaged with any framework dependency stack.
+
+The Go runtime is the reference implementation.
+
+This boundary gives ModelForge:
+
+- language independence;
+- dependency isolation;
+- crash isolation;
+- independent scaling;
+- a path for GPU- or accelerator-specific execution environments;
+- compatibility with frameworks that do not exist when the control plane is
+  released.
+
+## Serving path
+
+A normal request follows this path:
+
+```text
+POST /predict
+      |
+      v
+Environment target
+      |
+      +---- weighted canary? ---- yes ---> CANARY deployment
+      |                              
+      no
+      |
+      v
+ACTIVE stable deployment
+      |
+      v
+Immutable model version
+      |
+      v
+Runtime resolver
+   /         \
+  /           \
+in-process   external
+  |             |
+artifact       HTTP runtime
+verify/load     boundary
+  \             /
+   \           /
+       prediction
+```
+
+The prediction response includes the deployment ID, immutable model-version ID,
+framework, cache-hit information, traffic lane, and whether a canary fallback
+occurred.
+
+## Deployment invariants
+
+ModelForge preserves several invariants:
+
+- an environment has one authoritative stable deployment target;
+- a deployment can only move through validated lifecycle transitions;
+- a canary never replaces the stable target until promotion succeeds;
+- aborting a canary removes it from traffic without changing stable;
+- infrastructure failure while serving a canary can remove that canary and
+  fall back to stable for the triggering request;
+- promotion and rollback update deployment state and environment targets
+  transactionally;
+- registered artifacts are immutable identities, not mutable file pointers.
+
+## Failure containment
+
+External runtime calls are protected by:
+
+- bounded retries;
+- exponential backoff;
+- per-runtime circuit breakers;
+- health inspection;
+- Prometheus metrics;
+- deterministic failure/latency injection in the reference Go runtime.
+
+These policies are implemented at the runtime boundary so future frameworks
+inherit the same reliability behavior automatically.
+
+## Product surfaces
+
+ModelForge exposes the same control plane through:
+
+- the REST/OpenAPI API;
+- the browser dashboard at `/dashboard`;
+- the `modelforge` CLI.
+
+The dashboard and CLI are API clients. They do not bypass deployment lifecycle
+or runtime resolution.
+
+## Current scaling boundary
+
+ModelForge currently uses process-local model caches and runtime client state.
+That is intentional for the current project stage.
+
+A distributed version would move coordination concerns such as cache
+invalidation, asynchronous work, and runtime fleet membership behind explicit
+shared-state interfaces rather than changing framework integrations.

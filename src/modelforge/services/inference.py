@@ -4,18 +4,33 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from secrets import randbelow
+from typing import Any, Literal, cast
 
 from sqlalchemy.orm import Session
 
 from modelforge.models.deployment import Deployment, DeploymentState
+from modelforge.models.deployment_target import DeploymentTarget
 from modelforge.models.registry import ModelVersion
 from modelforge.services.artifacts import sha256_file
+from modelforge.services.canaries import abort_canary
 from modelforge.services.deployment_targets import get_deployment_target
-from modelforge.services.external_runtimes import ExternalRuntimeClient
+from modelforge.services.external_runtimes import (
+    ExternalRuntimeClient,
+    ExternalRuntimeError,
+)
+from modelforge.services.metrics import (
+    CANARY_AUTOMATIC_ROLLBACKS,
+    CANARY_TRAFFIC,
+)
 from modelforge.services.model_cache import ModelCache
 from modelforge.services.runtime_resolver import RuntimeResolver
-from modelforge.services.runtimes import ModelRuntime
+from modelforge.services.runtimes import (
+    ModelRuntime,
+    RuntimeNotFoundError,
+)
+
+TrafficLane = Literal["stable", "canary"]
 
 
 class InferenceConfigurationError(Exception):
@@ -41,6 +56,8 @@ class PredictionResult:
     model_version: str
     framework: str
     cache_hit: bool
+    traffic_lane: TrafficLane
+    canary_fallback: bool
 
 
 class InferenceService:
@@ -67,23 +84,93 @@ class InferenceService:
         environment: str,
         inputs: Any,
     ) -> PredictionResult:
-        """Run inference against an environment's authoritative deployment."""
+        """Run inference using weighted stable/canary routing."""
 
         target = get_deployment_target(session, environment)
+        deployment, lane = self._select_deployment(session, target)
 
-        deployment = session.get(
-            Deployment,
-            target.active_deployment_id,
-        )
+        try:
+            result = self._predict_deployment(
+                session,
+                target_environment=target.environment,
+                deployment=deployment,
+                inputs=inputs,
+                traffic_lane=lane,
+                canary_fallback=False,
+            )
+        except (
+            ArtifactUnavailableError,
+            ArtifactIntegrityError,
+            RuntimeNotFoundError,
+            InferenceConfigurationError,
+            ExternalRuntimeError,
+        ) as exc:
+            if lane != "canary":
+                raise
 
-        if deployment is None:
-            raise InferenceConfigurationError(
-                "Deployment target references a missing deployment."
+            abort_canary(
+                session,
+                deployment_id=deployment.id,
+                reason=(
+                    "Automatic rollback after canary serving failure: "
+                    f"{type(exc).__name__}."
+                ),
+            )
+            CANARY_AUTOMATIC_ROLLBACKS.labels(target.environment).inc()
+
+            stable = session.get(Deployment, target.active_deployment_id)
+            if stable is None:
+                raise InferenceConfigurationError(
+                    "Stable deployment disappeared during canary fallback."
+                ) from exc
+
+            result = self._predict_deployment(
+                session,
+                target_environment=target.environment,
+                deployment=stable,
+                inputs=inputs,
+                traffic_lane="stable",
+                canary_fallback=True,
             )
 
-        if deployment.state != DeploymentState.ACTIVE.value:
+        CANARY_TRAFFIC.labels(
+            result.environment,
+            result.traffic_lane,
+        ).inc()
+        return result
+
+    def _select_deployment(
+        self,
+        session: Session,
+        target: DeploymentTarget,
+    ) -> tuple[Deployment, TrafficLane]:
+        """Select stable or canary traffic based on configured weight."""
+
+        use_canary = (
+            target.canary_deployment_id is not None
+            and target.canary_weight > 0
+            and randbelow(100) < target.canary_weight
+        )
+
+        if use_canary:
+            deployment_id = target.canary_deployment_id
+            lane: TrafficLane = "canary"
+            expected_state = DeploymentState.CANARY
+        else:
+            deployment_id = target.active_deployment_id
+            lane = "stable"
+            expected_state = DeploymentState.ACTIVE
+
+        deployment = session.get(Deployment, deployment_id)
+        if deployment is None:
             raise InferenceConfigurationError(
-                "Deployment target does not reference an ACTIVE deployment."
+                f"{lane.capitalize()} target references a missing deployment."
+            )
+
+        if DeploymentState(deployment.state) is not expected_state:
+            raise InferenceConfigurationError(
+                f"{lane.capitalize()} deployment has invalid state "
+                f"'{deployment.state}'."
             )
 
         if deployment.environment != target.environment:
@@ -91,35 +178,42 @@ class InferenceService:
                 "Deployment target environment does not match deployment."
             )
 
-        model_version = session.get(
-            ModelVersion,
-            deployment.model_version_id,
-        )
+        return deployment, lane
 
+    def _predict_deployment(
+        self,
+        session: Session,
+        *,
+        target_environment: str,
+        deployment: Deployment,
+        inputs: Any,
+        traffic_lane: TrafficLane,
+        canary_fallback: bool,
+    ) -> PredictionResult:
+        """Execute one already-selected deployment."""
+
+        model_version = session.get(ModelVersion, deployment.model_version_id)
         if model_version is None:
             raise InferenceConfigurationError(
-                "Active deployment references a missing model version."
+                "Serving deployment references a missing model version."
             )
 
         resolved = self._resolver.resolve(model_version.framework)
 
         if resolved.mode == "external":
-            runtime = cast(
-                ExternalRuntimeClient,
-                resolved.runtime,
-            )
-
+            runtime = cast(ExternalRuntimeClient, resolved.runtime)
             prediction = runtime.predict(
                 inputs=inputs,
                 model=self._external_model_metadata(model_version),
             )
-
             return self._result(
                 prediction=prediction,
-                target_environment=target.environment,
+                target_environment=target_environment,
                 deployment=deployment,
                 model_version=model_version,
                 cache_hit=False,
+                traffic_lane=traffic_lane,
+                canary_fallback=canary_fallback,
             )
 
         runtime = cast(ModelRuntime, resolved.runtime)
@@ -134,17 +228,16 @@ class InferenceService:
             ),
         )
 
-        prediction = runtime.predict(
-            loaded_model,
-            inputs,
-        )
+        prediction = runtime.predict(loaded_model, inputs)
 
         return self._result(
             prediction=prediction,
-            target_environment=target.environment,
+            target_environment=target_environment,
             deployment=deployment,
             model_version=model_version,
             cache_hit=cache_hit,
+            traffic_lane=traffic_lane,
+            canary_fallback=canary_fallback,
         )
 
     @staticmethod
@@ -155,6 +248,8 @@ class InferenceService:
         deployment: Deployment,
         model_version: ModelVersion,
         cache_hit: bool,
+        traffic_lane: TrafficLane,
+        canary_fallback: bool,
     ) -> PredictionResult:
         return PredictionResult(
             prediction=prediction,
@@ -164,14 +259,14 @@ class InferenceService:
             model_version=model_version.version,
             framework=model_version.framework,
             cache_hit=cache_hit,
+            traffic_lane=traffic_lane,
+            canary_fallback=canary_fallback,
         )
 
     @staticmethod
     def _external_model_metadata(
         model_version: ModelVersion,
     ) -> dict[str, Any]:
-        """Describe an immutable model version to an external runtime."""
-
         return {
             "model_version_id": model_version.id,
             "version": model_version.version,
@@ -187,15 +282,12 @@ class InferenceService:
         expected_checksum: str,
         runtime: ModelRuntime,
     ) -> Any:
-        """Verify an immutable artifact once before loading it into memory."""
-
         if not artifact_path.is_file():
             raise ArtifactUnavailableError(
                 f"Artifact does not exist: {artifact_path}"
             )
 
         actual_checksum = sha256_file(artifact_path)
-
         if actual_checksum != expected_checksum:
             raise ArtifactIntegrityError(
                 "Artifact checksum does not match the registered model version."
@@ -205,11 +297,7 @@ class InferenceService:
 
     @staticmethod
     def _artifact_path(artifact_uri: str) -> Path:
-        """Convert a local artifact URI into a filesystem path."""
-
         prefix = "file://"
-
         if artifact_uri.startswith(prefix):
             return Path(artifact_uri[len(prefix):])
-
         return Path(artifact_uri)

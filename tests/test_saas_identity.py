@@ -29,7 +29,7 @@ def test_api_key_secret_is_returned_once_and_authenticates() -> None:
     assert created.status_code == 201
     secret = created.json()["secret"]
     assert secret.startswith("mf_live_")
-    assert created.json()["key_hash"] if "key_hash" in created.json() else True
+    assert "key_hash" not in created.json()
 
     listed = client.get("/api-keys")
     assert listed.status_code == 200

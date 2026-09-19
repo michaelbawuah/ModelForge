@@ -34,10 +34,19 @@ def test_dashboard_is_bundled_and_operational() -> None:
     assert "Runtime fleet" in response.text
     assert "Live inference" in response.text
     assert "API keys" in response.text
-    assert "X-ModelForge-Workspace" in response.text
-    assert "X-ModelForge-CSRF" in response.text
-    assert "/deployments/" in response.text
-    assert "/predict" in response.text
+    assert "/assets/dashboard.js" in response.text
+
+    script = client.get("/assets/dashboard.js")
+    assert script.status_code == 200
+    assert "X-ModelForge-Workspace" in script.text
+    assert "X-ModelForge-CSRF" in script.text
+    assert "/deployments/" in script.text
+    assert "/predict" in script.text
+
+    csp = response.headers["content-security-policy"]
+    assert "script-src 'self'" in csp
+    assert "style-src 'self'" in csp
+    assert "'unsafe-inline'" not in csp
 
 
 def test_dashboard_assets_are_external_and_allowlisted() -> None:

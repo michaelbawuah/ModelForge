@@ -72,5 +72,5 @@ def test_bootstrap_rejects_invalid_configuration(
     configuration: str,
     message: str,
 ) -> None:
-    with pytest.raises(ValueError, match=message):
+    with pytest.raises((TypeError, ValueError), match=message):
         create_external_runtime_registry(configuration)

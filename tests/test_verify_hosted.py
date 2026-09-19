@@ -9,7 +9,6 @@ import pytest
 
 from modelforge.hosted_verify import verify_hosted_release
 
-
 SECURITY_HEADERS = {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "X-Content-Type-Options": "nosniff",

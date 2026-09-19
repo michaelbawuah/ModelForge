@@ -6,7 +6,6 @@ import json
 
 import httpx
 import pytest
-
 from modelforge.hosted_verify import verify_hosted_release
 
 

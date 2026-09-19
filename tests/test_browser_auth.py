@@ -45,6 +45,7 @@ def test_browser_login_redirect_uses_pkce(monkeypatch) -> None:
     assert query["client_id"] == ["modelforge-web"]
     assert query["code_challenge_method"] == ["S256"]
     assert len(query["state"][0]) >= 32
+    assert len(query["nonce"][0]) >= 32
     assert len(query["code_challenge"][0]) >= 40
 
 
@@ -114,7 +115,13 @@ def test_browser_logout_revokes_session(monkeypatch) -> None:
     browser.cookies.set("mf_session", raw_session)
     browser.cookies.set("mf_csrf", csrf_secret)
 
-    response = browser.post("/auth/logout")
+    rejected = browser.post("/auth/logout")
+    assert rejected.status_code == 403
+
+    response = browser.post(
+        "/auth/logout",
+        headers={"X-ModelForge-CSRF": csrf_secret},
+    )
     assert response.status_code == 204
 
     identity = browser.get("/auth/me")

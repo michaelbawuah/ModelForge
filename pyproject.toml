@@ -44,7 +44,7 @@ cloud = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-"modelforge.dashboard" = ["*.html"]
+"modelforge.dashboard" = ["*.html", "*.css", "*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

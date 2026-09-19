@@ -44,7 +44,9 @@ jobs:
       - name: Apply database migrations
         run: alembic upgrade head
       - name: Lint
-        run: python -m ruff check .
+        run: |
+          python -m ruff check .
+          node --check src/modelforge/dashboard/dashboard.js
       - name: Test
         run: python -m pytest -q
 

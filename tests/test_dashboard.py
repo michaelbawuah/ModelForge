@@ -38,3 +38,27 @@ def test_dashboard_is_bundled_and_operational() -> None:
     assert "X-ModelForge-CSRF" in response.text
     assert "/deployments/" in response.text
     assert "/predict" in response.text
+
+
+def test_dashboard_assets_are_external_and_allowlisted() -> None:
+    dashboard = client.get("/dashboard")
+    landing = client.get("/")
+    script = client.get("/assets/dashboard.js")
+    dashboard_css = client.get("/assets/dashboard.css")
+    landing_css = client.get("/assets/landing.css")
+
+    assert "<style>" not in dashboard.text
+    assert "<script>" not in dashboard.text
+    assert "/assets/dashboard.js" in dashboard.text
+    assert "/assets/dashboard.css" in dashboard.text
+    assert "<style>" not in landing.text
+    assert "/assets/landing.css" in landing.text
+
+    assert script.status_code == 200
+    assert "application/javascript" in script.headers["content-type"]
+    assert dashboard_css.status_code == 200
+    assert "text/css" in dashboard_css.headers["content-type"]
+    assert landing_css.status_code == 200
+
+    missing = client.get("/assets/not-allowed.txt")
+    assert missing.status_code == 404

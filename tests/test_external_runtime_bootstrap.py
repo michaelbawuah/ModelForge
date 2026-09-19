@@ -80,3 +80,25 @@ def test_bootstrap_rejects_invalid_configuration(
 ) -> None:
     with pytest.raises((TypeError, ValueError), match=message):
         create_external_runtime_registry(configuration)
+
+
+
+def test_bootstrap_resolves_runtime_secret_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FUTURE_RUNTIME_TOKEN", "runtime-secret")
+
+    registry = create_external_runtime_registry(
+        '{"future-ai":{"base_url":"http://runtime:9000",'
+        '"auth_token_env":"FUTURE_RUNTIME_TOKEN"}}'
+    )
+
+    assert registry.get("future-ai").spec.auth_token == "runtime-secret"
+
+
+def test_bootstrap_rejects_missing_runtime_secret() -> None:
+    with pytest.raises(ValueError, match="MISSING_RUNTIME_TOKEN"):
+        create_external_runtime_registry(
+            '{"future-ai":{"base_url":"http://runtime:9000",'
+            '"auth_token_env":"MISSING_RUNTIME_TOKEN"}}'
+        )

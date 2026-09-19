@@ -28,10 +28,15 @@ services:
     environment:
       MODELFORGE_GO_RUNTIME_FAIL_EVERY: ${MODELFORGE_GO_RUNTIME_FAIL_EVERY:-0}
       MODELFORGE_GO_RUNTIME_DELAY_MS: ${MODELFORGE_GO_RUNTIME_DELAY_MS:-0}
+      MODELFORGE_RUNTIME_TOKEN: ${MODELFORGE_RUNTIME_TOKEN:-modelforge_dev_runtime_token}
     ports:
       - "8090:8090"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/health"]
+      test:
+        - CMD-SHELL
+        - >-
+          wget -qO- --header="Authorization: Bearer $$MODELFORGE_RUNTIME_TOKEN"
+          http://127.0.0.1:8090/health >/dev/null
       interval: 5s
       timeout: 3s
       retries: 10
@@ -44,19 +49,18 @@ services:
     container_name: modelforge-api
     restart: unless-stopped
     environment:
+      MODELFORGE_ENV: development
+      MODELFORGE_RUN_MIGRATIONS: "true"
       DATABASE_URL: mysql+pymysql://modelforge:modelforge_dev@mysql:3306/modelforge
       MODEL_ARTIFACT_ROOT: /var/lib/modelforge/artifacts
+      MODELFORGE_RUNTIME_TOKEN: ${MODELFORGE_RUNTIME_TOKEN:-modelforge_dev_runtime_token}
       MODELFORGE_EXTERNAL_RUNTIMES: >-
-        {"go-linear":{"name":"modelforge-go-runtime","base_url":"http://go-runtime:8090","timeout_seconds":2.0,"max_retries":2,"retry_backoff_seconds":0.01,"circuit_failure_threshold":3,"circuit_reset_seconds":5.0}}
+        {"go-linear":{"name":"modelforge-go-runtime","base_url":"http://go-runtime:8090","timeout_seconds":2.0,"max_retries":2,"retry_backoff_seconds":0.01,"circuit_failure_threshold":3,"circuit_reset_seconds":5.0,"auth_token_env":"MODELFORGE_RUNTIME_TOKEN"}}
     depends_on:
       mysql:
         condition: service_healthy
       go-runtime:
         condition: service_healthy
-    command:
-      - /bin/sh
-      - -c
-      - alembic upgrade head && exec uvicorn modelforge.api.app:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     volumes:

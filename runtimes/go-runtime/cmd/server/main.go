@@ -23,6 +23,7 @@ const (
 	runtimeAddressEnvName = "MODELFORGE_GO_RUNTIME_ADDR"
 	failEveryEnvName      = "MODELFORGE_GO_RUNTIME_FAIL_EVERY"
 	delayMillisecondsEnv  = "MODELFORGE_GO_RUNTIME_DELAY_MS"
+	runtimeTokenEnvName   = "MODELFORGE_RUNTIME_TOKEN"
 )
 
 func main() {
@@ -37,7 +38,15 @@ func main() {
 	}
 
 	engine := runtimeengine.New()
-	runtimeServer := server.NewWithFaults(engine, logger, faults)
+	runtimeToken := os.Getenv(runtimeTokenEnvName)
+	runtimeServer := server.NewWithOptions(
+		engine,
+		logger,
+		server.Options{
+			Faults:    faults,
+			AuthToken: runtimeToken,
+		},
+	)
 
 	address := os.Getenv(runtimeAddressEnvName)
 	if address == "" {
@@ -58,6 +67,7 @@ func main() {
 			"address", address,
 			"fault_fail_every", faults.FailEvery,
 			"fault_delay_ms", faults.Delay.Milliseconds(),
+			"auth_enabled", runtimeToken != "",
 		)
 
 		err := httpServer.ListenAndServe()

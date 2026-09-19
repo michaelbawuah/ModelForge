@@ -137,3 +137,43 @@ func TestInjectedFailureIsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+func TestRuntimeAuthRejectsMissingBearerToken(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	runtimeServer := NewWithOptions(
+		runtimeengine.New(),
+		logger,
+		Options{AuthToken: "runtime-secret"},
+	)
+
+	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+	recorder := httptest.NewRecorder()
+
+	runtimeServer.Handler().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+	if recorder.Header().Get("WWW-Authenticate") != "Bearer" {
+		t.Fatalf("missing bearer challenge")
+	}
+}
+
+func TestRuntimeAuthAcceptsBearerToken(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	runtimeServer := NewWithOptions(
+		runtimeengine.New(),
+		logger,
+		Options{AuthToken: "runtime-secret"},
+	)
+
+	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+	request.Header.Set("Authorization", "Bearer runtime-secret")
+	recorder := httptest.NewRecorder()
+
+	runtimeServer.Handler().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+}

@@ -44,6 +44,7 @@ class ExternalRuntimeSpec:
 
     name: str
     base_url: str
+    auth_token: str | None = None
     timeout_seconds: float = 10.0
     max_retries: int = 1
     retry_backoff_seconds: float = 0.05
@@ -55,6 +56,8 @@ class ExternalRuntimeSpec:
             raise ValueError("External runtime name cannot be empty.")
         if not self.base_url.strip():
             raise ValueError("External runtime base URL cannot be empty.")
+        if self.auth_token is not None and not self.auth_token.strip():
+            raise ValueError("External runtime auth token cannot be empty.")
         if self.timeout_seconds <= 0:
             raise ValueError("External runtime timeout must be greater than zero.")
         if (
@@ -254,9 +257,24 @@ class ExternalRuntimeClient:
 
         for attempt in range(attempts):
             try:
+                headers = self._auth_headers()
+
                 if method == "GET":
-                    response = httpx.get(
+                    if headers is None:
+                        response = httpx.get(
+                            self._url(path),
+                            timeout=self._spec.timeout_seconds,
+                        )
+                    else:
+                        response = httpx.get(
+                            self._url(path),
+                            timeout=self._spec.timeout_seconds,
+                            headers=headers,
+                        )
+                elif headers is None:
+                    response = httpx.post(
                         self._url(path),
+                        json=json_payload,
                         timeout=self._spec.timeout_seconds,
                     )
                 else:
@@ -264,6 +282,7 @@ class ExternalRuntimeClient:
                         self._url(path),
                         json=json_payload,
                         timeout=self._spec.timeout_seconds,
+                        headers=headers,
                     )
             except httpx.RequestError as exc:
                 if attempt + 1 < attempts:
@@ -303,6 +322,13 @@ class ExternalRuntimeClient:
             return response
 
         raise RuntimeError("External runtime request loop terminated unexpectedly.")
+
+    def _auth_headers(self) -> dict[str, str] | None:
+        """Return runtime authentication headers without exposing the secret."""
+
+        if self._spec.auth_token is None:
+            return None
+        return {"Authorization": f"Bearer {self._spec.auth_token}"}
 
     def _record_retry(self, operation: str, attempt: int) -> None:
         """Record and back off before a retry."""

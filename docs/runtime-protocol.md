@@ -53,6 +53,30 @@ Successful response:
 
 The `prediction` value may be any JSON-compatible value.
 
+## Runtime authentication
+
+External runtime authentication is optional so local/self-hosted private-network setups stay simple. For hosted deployments, ModelForge can send a bearer token on both `/health` and `/predict`.
+
+Keep the secret in its own environment variable and reference only that variable name from runtime configuration:
+
+```json
+{
+  "future-framework": {
+    "name": "future-runtime",
+    "base_url": "http://future-runtime:9000",
+    "auth_token_env": "FUTURE_RUNTIME_TOKEN"
+  }
+}
+```
+
+When configured, requests include:
+
+```text
+Authorization: Bearer <runtime secret>
+```
+
+The reference Go runtime reads the same secret from `MODELFORGE_RUNTIME_TOKEN` and rejects unauthenticated requests. Deployments may also omit the token when the runtime is protected by a trusted private network or stronger transport controls.
+
 ## Error semantics
 
 A runtime should use:
@@ -81,7 +105,8 @@ and points it at the external runtime service:
     "max_retries": 2,
     "retry_backoff_seconds": 0.05,
     "circuit_failure_threshold": 3,
-    "circuit_reset_seconds": 30.0
+    "circuit_reset_seconds": 30.0,
+    "auth_token_env": "FUTURE_RUNTIME_TOKEN"
   }
 }
 ```

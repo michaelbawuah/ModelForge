@@ -1,0 +1,32 @@
+aws_region  = "us-east-1"
+environment = "production"
+
+domain_name    = "modelforge.example.com"
+certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/REPLACE_ME"
+
+# Optional when Route53 hosts the domain. Otherwise create the DNS record
+# manually using the alb_dns_name output.
+route53_zone_id = null
+
+# OIDC provider settings.
+oidc_issuer            = "https://YOUR_IDP/"
+oidc_audience          = "https://modelforge.example.com"
+oidc_jwks_url          = "https://YOUR_IDP/.well-known/jwks.json"
+oidc_authorization_url = "https://YOUR_IDP/authorize"
+oidc_token_url         = "https://YOUR_IDP/oauth/token"
+oidc_client_id         = "YOUR_CLIENT_ID"
+
+# Set true for providers requiring a confidential client secret.
+oidc_client_secret_required = false
+
+# Start false for the infrastructure/bootstrap apply. After secrets are
+# populated, images are pushed, and the migration task succeeds, set true.
+activate_services = false
+
+# Cost-aware defaults are intentionally conservative. For a higher-availability
+# production environment, enable both options.
+ha_nat_gateways = false
+db_multi_az     = false
+
+# Pin when you want an explicit RDS MySQL engine version.
+mysql_engine_version = null

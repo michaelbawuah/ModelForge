@@ -9,6 +9,7 @@ MODELFORGE_FORWARDED_ALLOW_IPS="${MODELFORGE_FORWARDED_ALLOW_IPS:-127.0.0.1}"
 modelforge config-check >/dev/null
 
 if [ "${MODELFORGE_RUN_MIGRATIONS:-false}" = "true" ]; then
+  python -m modelforge.core.database_ready
   alembic upgrade head
 fi
 

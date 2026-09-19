@@ -48,9 +48,17 @@ The API image accepts:
 - `MODELFORGE_FORWARDED_ALLOW_IPS` — trusted proxy IPs for forwarded headers;
 - `MODELFORGE_RUN_MIGRATIONS=true` — optional single-instance/local convenience migration path.
 
-The production recommendation is to run migrations as a separate release task:
+When `MODELFORGE_RUN_MIGRATIONS=true`, the container first executes a bounded
+database readiness probe before Alembic. This protects local stacks and one-shot
+release jobs from database cold-start or initialization handoff races. Tune the
+bound with `MODELFORGE_DB_STARTUP_ATTEMPTS` and
+`MODELFORGE_DB_STARTUP_DELAY_SECONDS`.
+
+The production recommendation is still to run migrations as a separate release
+task:
 
 ```bash
+python -m modelforge.core.database_ready
 alembic upgrade head
 ```
 

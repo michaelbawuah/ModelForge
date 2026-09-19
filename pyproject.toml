@@ -18,6 +18,9 @@ dependencies = [
     "prometheus-client>=0.22,<1",
 ]
 
+[project.scripts]
+modelforge = "modelforge.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
@@ -36,6 +39,9 @@ onnx = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"modelforge.dashboard" = ["*.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
@@ -43,4 +49,3 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-\n[tool.setuptools.package-data]\n"modelforge.dashboard" = ["*.html"]\n

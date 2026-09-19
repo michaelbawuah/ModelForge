@@ -66,9 +66,16 @@ Then start one or more API replicas from the same immutable image. Do not run th
 
 ## Managed MySQL
 
-Create a MySQL database reachable only from the ModelForge service network. Put the complete SQLAlchemy URL in `DATABASE_URL` through the cloud secret manager.
+Create a MySQL database reachable only from the ModelForge service network. A
+complete SQLAlchemy `DATABASE_URL` remains supported, but cloud deployments can
+instead set `MODELFORGE_DATABASE_HOST`, `MODELFORGE_DATABASE_PORT`,
+`MODELFORGE_DATABASE_NAME`, and `MODELFORGE_DATABASE_USER` as ordinary
+configuration while injecting only `MODELFORGE_DATABASE_PASSWORD` from the
+cloud secret manager. ModelForge assembles and escapes the connection URL
+internally.
 
-ModelForge uses `pool_pre_ping` so stale pooled connections fail before they reach request handling. Schema changes remain Alembic-managed.
+ModelForge uses `pool_pre_ping` so stale pooled connections fail before they
+reach request handling. Schema changes remain Alembic-managed.
 
 ## Artifact bucket
 

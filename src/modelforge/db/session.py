@@ -1,15 +1,11 @@
 """Database engine and session management."""
 
-import os
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-DEFAULT_DATABASE_URL = (
-    "mysql+pymysql://modelforge:modelforge_dev@127.0.0.1:3306/modelforge"
-)
+from modelforge.core.config import resolve_database_url
 
-DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+DATABASE_URL = resolve_database_url()
 
 # pool_pre_ping checks connections before handing them to the application.
 # This prevents stale database connections from surviving unnoticed.

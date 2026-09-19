@@ -8,10 +8,10 @@ from collections.abc import Callable
 from time import sleep
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
-from modelforge.core.config import DEFAULT_DATABASE_URL
+from modelforge.core.config import resolve_database_url
 
 DEFAULT_ATTEMPTS = 30
 DEFAULT_DELAY_SECONDS = 1.0
@@ -47,7 +47,7 @@ def wait_for_database(
 ) -> int:
     """Wait until MySQL accepts a real query, returning the successful attempt."""
 
-    resolved_url = database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    resolved_url = database_url or resolve_database_url()
 
     resolved_attempts = attempts
     if resolved_attempts is None:

@@ -8,6 +8,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from sqlalchemy.engine import URL
+
 DEFAULT_DATABASE_URL = (
     "mysql+pymysql://modelforge:modelforge_dev@127.0.0.1:3306/modelforge"
 )
@@ -50,6 +52,57 @@ def _value(environment: Mapping[str, str], name: str, default: str = "") -> str:
 
 def _truthy(value: str) -> bool:
     return value.strip().lower() in _TRUE_VALUES
+
+
+def resolve_database_url(
+    environment: Mapping[str, str] | None = None,
+) -> str:
+    """Resolve a direct URL or cloud-friendly database component settings."""
+
+    env = os.environ if environment is None else environment
+    direct = _value(env, "DATABASE_URL")
+    if direct:
+        return direct
+
+    host = _value(env, "MODELFORGE_DATABASE_HOST")
+    if not host:
+        return DEFAULT_DATABASE_URL
+
+    required = {
+        "MODELFORGE_DATABASE_USER": _value(env, "MODELFORGE_DATABASE_USER"),
+        "MODELFORGE_DATABASE_PASSWORD": _value(
+            env,
+            "MODELFORGE_DATABASE_PASSWORD",
+        ),
+        "MODELFORGE_DATABASE_NAME": _value(env, "MODELFORGE_DATABASE_NAME"),
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        raise ValueError(
+            "Database component configuration is incomplete; missing: "
+            + ", ".join(missing)
+            + "."
+        )
+
+    raw_port = _value(env, "MODELFORGE_DATABASE_PORT", "3306")
+    try:
+        port = int(raw_port)
+    except ValueError as exc:
+        raise ValueError("MODELFORGE_DATABASE_PORT must be an integer.") from exc
+    if port <= 0 or port > 65535:
+        raise ValueError(
+            "MODELFORGE_DATABASE_PORT must be between 1 and 65535."
+        )
+
+    url = URL.create(
+        "mysql+pymysql",
+        username=required["MODELFORGE_DATABASE_USER"],
+        password=required["MODELFORGE_DATABASE_PASSWORD"],
+        host=host,
+        port=port,
+        database=required["MODELFORGE_DATABASE_NAME"],
+    )
+    return url.render_as_string(hide_password=False)
 
 
 def _origin(value: str) -> tuple[str, str, int | None] | None:
@@ -150,11 +203,16 @@ def validate_deployment_config(
     )
 
     if deployment_environment == "production":
-        database_url = _value(env, "DATABASE_URL")
-        if not database_url or database_url == DEFAULT_DATABASE_URL:
-            errors.append(
-                "DATABASE_URL must be set to a non-development database in production."
-            )
+        try:
+            database_url = resolve_database_url(env)
+        except ValueError as exc:
+            errors.append(str(exc))
+        else:
+            if database_url == DEFAULT_DATABASE_URL:
+                errors.append(
+                    "Production requires DATABASE_URL or complete "
+                    "MODELFORGE_DATABASE_* settings for a non-development database."
+                )
 
         if artifact_backend != "s3":
             errors.append(

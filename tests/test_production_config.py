@@ -6,6 +6,7 @@ import pytest
 
 from modelforge.core.config import (
     ProductionConfigError,
+    resolve_database_url,
     validate_deployment_config,
 )
 
@@ -101,3 +102,47 @@ def test_external_runtime_without_auth_token_warns_instead_of_guessing_network_p
 
     assert report.external_runtime_count == 1
     assert "trusted private network" in report.warnings[0]
+
+
+
+def test_database_url_can_be_built_from_cloud_secret_components() -> None:
+    environment = {
+        "MODELFORGE_DATABASE_HOST": "db.internal",
+        "MODELFORGE_DATABASE_PORT": "3307",
+        "MODELFORGE_DATABASE_NAME": "modelforge",
+        "MODELFORGE_DATABASE_USER": "app",
+        "MODELFORGE_DATABASE_PASSWORD": "p@ss/word",
+    }
+
+    url = resolve_database_url(environment)
+
+    assert url == (
+        "mysql+pymysql://app:p%40ss%2Fword@db.internal:3307/modelforge"
+    )
+
+
+def test_production_accepts_database_components_without_full_url() -> None:
+    environment = production_environment()
+    environment.pop("DATABASE_URL")
+    environment.update(
+        {
+            "MODELFORGE_DATABASE_HOST": "db.internal",
+            "MODELFORGE_DATABASE_PORT": "3306",
+            "MODELFORGE_DATABASE_NAME": "modelforge",
+            "MODELFORGE_DATABASE_USER": "app",
+            "MODELFORGE_DATABASE_PASSWORD": "secret",
+        }
+    )
+
+    report = validate_deployment_config(environment)
+
+    assert report.environment == "production"
+
+
+def test_production_rejects_incomplete_database_components() -> None:
+    environment = production_environment()
+    environment.pop("DATABASE_URL")
+    environment["MODELFORGE_DATABASE_HOST"] = "db.internal"
+
+    with pytest.raises(ProductionConfigError, match="MODELFORGE_DATABASE_USER"):
+        validate_deployment_config(environment)

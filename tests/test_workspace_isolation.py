@@ -6,8 +6,7 @@ from fastapi.testclient import TestClient
 
 from modelforge.api.app import app
 from modelforge.db.session import SessionLocal
-from modelforge.services.identity import create_api_key, create_workspace
-from modelforge.services.identity import upsert_user
+from modelforge.services.identity import create_api_key, create_workspace, upsert_user
 
 client = TestClient(app)
 

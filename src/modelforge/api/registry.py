@@ -33,9 +33,7 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 CurrentPrincipal = Annotated[Principal, Depends(get_principal)]
 
 
-def get_artifact_store() -> ArtifactStore:
-    return create_artifact_store()
-
+get_artifact_store = create_artifact_store
 
 ArtifactStorage = Annotated[ArtifactStore, Depends(get_artifact_store)]
 

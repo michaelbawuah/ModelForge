@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -16,15 +17,21 @@ type FaultConfig struct {
 	Delay     time.Duration
 }
 
+type Options struct {
+	Faults    FaultConfig
+	AuthToken string
+}
+
 type Server struct {
 	runtime      *runtimeengine.Runtime
 	logger       *slog.Logger
 	faults       FaultConfig
+	authToken    string
 	requestCount atomic.Uint64
 }
 
 func New(runtime *runtimeengine.Runtime, logger *slog.Logger) *Server {
-	return NewWithFaults(runtime, logger, FaultConfig{})
+	return NewWithOptions(runtime, logger, Options{})
 }
 
 func NewWithFaults(
@@ -32,10 +39,23 @@ func NewWithFaults(
 	logger *slog.Logger,
 	faults FaultConfig,
 ) *Server {
+	return NewWithOptions(
+		runtime,
+		logger,
+		Options{Faults: faults},
+	)
+}
+
+func NewWithOptions(
+	runtime *runtimeengine.Runtime,
+	logger *slog.Logger,
+	options Options,
+) *Server {
 	return &Server{
-		runtime: runtime,
-		logger:  logger,
-		faults:  faults,
+		runtime:   runtime,
+		logger:    logger,
+		faults:    options.Faults,
+		authToken: options.AuthToken,
 	}
 }
 
@@ -45,7 +65,25 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("POST /predict", s.predict)
 
-	return mux
+	if s.authToken == "" {
+		return mux
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expected := "Bearer " + s.authToken
+		supplied := r.Header.Get("Authorization")
+
+		if subtle.ConstantTimeCompare(
+			[]byte(supplied),
+			[]byte(expected),
+		) != 1 {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			writeError(w, http.StatusUnauthorized, "runtime authentication required")
+			return
+		}
+
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {

@@ -208,3 +208,29 @@ def test_external_runtime_surfaces_network_failure(
 
     with pytest.raises(ExternalRuntimeUnavailableError):
         client.health()
+
+
+def test_external_runtime_sends_bearer_token_when_configured(monkeypatch) -> None:
+    def fake_get(
+        url: str,
+        *,
+        timeout: float,
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        assert url == "http://secure-runtime:9000/health"
+        assert timeout == 2.0
+        assert headers == {"Authorization": "Bearer runtime-secret"}
+        return httpx.Response(200, json={"status": "healthy"})
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    client = ExternalRuntimeClient(
+        ExternalRuntimeSpec(
+            name="secure-runtime",
+            base_url="http://secure-runtime:9000",
+            auth_token="runtime-secret",
+            timeout_seconds=2.0,
+        )
+    )
+
+    assert client.health() is True

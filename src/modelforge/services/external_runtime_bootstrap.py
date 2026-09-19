@@ -14,6 +14,7 @@ _ALLOWED_FIELDS = frozenset(
     {
         "name",
         "base_url",
+        "auth_token_env",
         "timeout_seconds",
         "max_retries",
         "retry_backoff_seconds",
@@ -96,6 +97,7 @@ def _register_runtime(
         ExternalRuntimeSpec(
             name=name,
             base_url=base_url,
+            auth_token=_secret_setting(settings, framework),
             timeout_seconds=timeout_seconds,
             max_retries=_integer_setting(settings, "max_retries", 1),
             retry_backoff_seconds=_float_setting(
@@ -141,3 +143,27 @@ def _float_setting(
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError(f"{name} must be numeric.")
     return float(value)
+
+
+
+def _secret_setting(
+    settings: dict[str, Any],
+    framework: str,
+) -> str | None:
+    """Resolve an optional runtime bearer token from a separate environment variable."""
+
+    environment_name = settings.get("auth_token_env")
+    if environment_name is None:
+        return None
+    if not isinstance(environment_name, str) or not environment_name.strip():
+        raise ValueError(
+            f"External runtime '{framework}' auth_token_env must be a non-empty string."
+        )
+
+    secret = os.getenv(environment_name, "")
+    if not secret:
+        raise ValueError(
+            f"External runtime '{framework}' references missing secret "
+            f"environment variable '{environment_name}'."
+        )
+    return secret

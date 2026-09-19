@@ -44,6 +44,8 @@ services:
     container_name: modelforge-api
     restart: unless-stopped
     environment:
+      MODELFORGE_ENV: development
+      MODELFORGE_RUN_MIGRATIONS: "true"
       DATABASE_URL: mysql+pymysql://modelforge:modelforge_dev@mysql:3306/modelforge
       MODEL_ARTIFACT_ROOT: /var/lib/modelforge/artifacts
       MODELFORGE_EXTERNAL_RUNTIMES: >-
@@ -53,10 +55,6 @@ services:
         condition: service_healthy
       go-runtime:
         condition: service_healthy
-    command:
-      - /bin/sh
-      - -c
-      - alembic upgrade head && exec uvicorn modelforge.api.app:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     volumes:

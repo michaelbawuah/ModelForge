@@ -10,6 +10,11 @@ from typing import Any
 
 import httpx
 
+from modelforge.core.config import (
+    ProductionConfigError,
+    validate_deployment_config,
+)
+
 DEFAULT_URL = "http://127.0.0.1:8000"
 
 
@@ -116,6 +121,10 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     commands.add_parser("status", help="Show API, readiness and runtime health.")
+    commands.add_parser(
+        "config-check",
+        help="Validate local deployment configuration without contacting the API.",
+    )
     commands.add_parser("models", help="List registered models.")
     commands.add_parser("whoami", help="Show the authenticated workspace context.")
 
@@ -246,6 +255,14 @@ def main(
 
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "config-check":
+        try:
+            report = validate_deployment_config()
+        except ProductionConfigError as exc:
+            parser.exit(1, f"modelforge: {exc}\n")
+        _print_json(report.as_dict())
+        return 0
+
     api = api_factory(
         args.base_url,
         args.timeout,

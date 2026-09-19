@@ -124,3 +124,20 @@ def test_cli_workspace_selection_is_forwarded() -> None:
 
     assert instances[0].workspace == "acme"
     assert instances[0].calls == [("GET", "/auth/me", None)]
+
+
+def test_cli_config_check_is_local_and_does_not_construct_api(
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setenv("MODELFORGE_ENV", "development")
+
+    def factory(*args, **kwargs):
+        raise AssertionError("config-check must not construct an HTTP client")
+
+    exit_code = main(["config-check"], api_factory=factory)
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert '"environment": "development"' in output
+    assert '"status": "valid"' in output

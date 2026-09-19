@@ -12,11 +12,14 @@ from modelforge.api.metrics import router as metrics_router
 from modelforge.api.registry import router as registry_router
 from modelforge.api.runtimes import router as runtime_router
 from modelforge.api.system import router as system_router
+from modelforge.core.config import validate_deployment_config
 from modelforge.services.security import configure_security
 
 
 def create_app() -> FastAPI:
     """Create and configure the ModelForge API application."""
+
+    validate_deployment_config()
 
     app = FastAPI(
         title="ModelForge",

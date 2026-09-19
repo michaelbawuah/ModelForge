@@ -78,7 +78,7 @@ class InferenceService:
         self._cache = cache
         self._artifact_store = artifact_store or create_artifact_store()
 
-    def with_artifact_store(self, artifact_store: ArtifactStore) -> "InferenceService":
+    def with_artifact_store(self, artifact_store: ArtifactStore) -> InferenceService:
         """Clone orchestration context while sharing runtime resolution and cache."""
 
         return InferenceService(

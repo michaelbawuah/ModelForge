@@ -35,7 +35,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          wget -qO- --header="Authorization: Bearer $MODELFORGE_RUNTIME_TOKEN"
+          wget -qO- --header="Authorization: Bearer $$MODELFORGE_RUNTIME_TOKEN"
           http://127.0.0.1:8090/health >/dev/null
       interval: 5s
       timeout: 3s

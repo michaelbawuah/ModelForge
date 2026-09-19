@@ -14,6 +14,8 @@ COPY src ./src
 COPY scripts ./scripts
 
 ARG MODELFORGE_EXTRAS=""
+ARG MODELFORGE_BUILD_SHA="unknown"
+ENV MODELFORGE_BUILD_SHA="${MODELFORGE_BUILD_SHA}"
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && if [ -n "$MODELFORGE_EXTRAS" ]; then \
          python -m pip install --no-cache-dir ".[$MODELFORGE_EXTRAS]"; \

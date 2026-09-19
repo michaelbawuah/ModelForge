@@ -15,6 +15,7 @@ def test_health() -> None:
     assert response.json() == {
         "status": "healthy",
         "service": "modelforge-api",
+        "build_sha": "unknown",
     }
 
 

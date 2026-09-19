@@ -24,6 +24,7 @@ jobs:
       MODELFORGE_URL: ${{ vars.MODELFORGE_PUBLIC_URL }}
       MODELFORGE_API_KEY: ${{ secrets.MODELFORGE_DEMO_API_KEY }}
       MODELFORGE_WORKSPACE: ${{ vars.MODELFORGE_DEMO_WORKSPACE }}
+      MODELFORGE_PROOF_ENVIRONMENT: ${{ inputs.environment }}
 
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +53,11 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "${MODELFORGE_PROOF_ENVIRONMENT}" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]{0,47}$ ]]; then
+            echo "Proof environment must be 1-48 letters, digits, hyphens, or underscores and start with a letter or digit." >&2
+            exit 1
+          fi
+
       - name: Install proof client
         run: python -m pip install -e .
 
@@ -67,7 +73,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python demo/proof_scenario.py             --environment "${{ inputs.environment }}-${GITHUB_RUN_ID}"             --weight 50             --traffic-requests 60             --output-dir hosted-demo-proof             2>&1 | tee hosted-demo-proof.log
+          python demo/proof_scenario.py \
+            --environment "${MODELFORGE_PROOF_ENVIRONMENT}-${GITHUB_RUN_ID}" \
+            --weight 50 \
+            --traffic-requests 60 \
+            --output-dir hosted-demo-proof \
+            2>&1 | tee hosted-demo-proof.log
 
       - name: Upload hosted proof evidence
         if: always()

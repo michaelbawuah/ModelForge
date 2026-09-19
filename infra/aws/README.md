@@ -123,6 +123,7 @@ TAG="YOUR_GIT_SHA"
 
 docker buildx build \
   --platform linux/amd64 \
+  --build-arg "MODELFORGE_BUILD_SHA=$TAG" \
   -t "$API_REPO:$TAG" \
   --push \
   ../..
@@ -242,13 +243,17 @@ It then:
 4. runs the migration task and requires exit code 0;
 5. deploys the runtime and waits for ECS stability;
 6. deploys the API and waits for ECS stability;
-7. verifies public `/health` and `/ready`;
+7. verifies public `/health` reports the exact released commit SHA and
+   `/ready` succeeds;
 8. rolls services back to their previous task definitions if deployment or
    verification fails.
 
 A release can be rerun safely after a transient failure: ECR repositories are
 immutable, and the workflow reuses images already published for the same commit
-SHA instead of attempting to overwrite them. Automated releases also fail
+SHA instead of attempting to overwrite them. Manually published API images must
+set `MODELFORGE_BUILD_SHA` to the same commit SHA when built; a healthy service
+with a different or unknown build SHA fails verification and triggers rollback.
+Automated releases also fail
 closed when the API/runtime ECS services still have desired count zero; perform
 the documented initial `activate_services=true` Terraform apply first.
 

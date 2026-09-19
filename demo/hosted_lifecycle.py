@@ -259,8 +259,10 @@ def _render_markdown(evidence: dict[str, Any]) -> str:
             f"- Canary traffic: {final_target['canary_weight']}%",
             f"- Dashboard: {evidence['dashboard_url']}",
             "",
-            "The final canary is intentionally left active so the deployment can be "
-            "opened in the ModelForge console and captured for recruiter-facing proof.",
+            (
+                "The final canary is intentionally left active so the deployment can be "
+                "opened in the ModelForge console and captured for recruiter-facing proof."
+            ),
             "",
         ]
     )

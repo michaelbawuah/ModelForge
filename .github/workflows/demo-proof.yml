@@ -55,13 +55,12 @@ jobs:
       - name: Install proof client
         run: python -m pip install -e .
 
-      - name: Verify hosted service health
+      - name: Verify hosted production surface
         shell: bash
         run: |
           set -euo pipefail
-          BASE_URL="${MODELFORGE_URL%/}"
-          curl --fail --silent --show-error "${BASE_URL}/health" >/dev/null
-          curl --fail --silent --show-error "${BASE_URL}/ready" >/dev/null
+          python scripts/verify_hosted.py \
+            --output hosted-release-evidence.json
 
       - name: Run hosted deployment proof
         shell: bash
@@ -75,6 +74,7 @@ jobs:
         with:
           name: modelforge-hosted-demo-proof-${{ github.run_id }}
           path: |
+            hosted-release-evidence.json
             hosted-demo-proof/
             hosted-demo-proof.log
           if-no-files-found: ignore

@@ -1,4 +1,4 @@
-.PHONY: install lint test go-test check up down demo proof benchmark clean
+.PHONY: install lint test go-test check up down demo proof hosted-verify benchmark clean
 
 install:
 	python -m pip install -e ".[dev,pytorch,onnx]"
@@ -27,6 +27,9 @@ demo:
 
 proof:
 	python demo/proof_scenario.py --environment recruiter-demo --output-dir demo-proof-evidence
+
+hosted-verify:
+	python scripts/verify_hosted.py
 
 benchmark:
 	python benchmarks/bootstrap_external.py --environment benchmark-go

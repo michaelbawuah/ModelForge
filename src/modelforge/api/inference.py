@@ -53,15 +53,12 @@ def get_inference_service() -> InferenceService:
 
 
 def get_request_inference_service(
+    service: Annotated[InferenceService, Depends(get_inference_service)],
     artifact_store: Annotated[ArtifactStore, Depends(create_artifact_store)],
 ) -> InferenceService:
-    """Bind request-scoped artifact storage to the shared runtime/cache layer."""
+    """Bind request-scoped storage to the selected inference implementation."""
 
-    return InferenceService(
-        resolver=_runtime_resolver,
-        cache=_model_cache,
-        artifact_store=artifact_store,
-    )
+    return service.with_artifact_store(artifact_store)
 
 
 def get_runtime_registry() -> RuntimeRegistry:

@@ -147,7 +147,12 @@ def test_registry_failure_cleans_up_stored_artifact(tmp_path) -> None:
     store = LocalArtifactStore(tmp_path / "artifacts")
 
     session = MagicMock()
-    model = Model(id=42, name="cleanup-test-model", description=None)
+    model = Model(
+        id=42,
+        workspace_id=1,
+        name="cleanup-test-model",
+        description=None,
+    )
 
     session.get.return_value = model
     session.scalar.return_value = None

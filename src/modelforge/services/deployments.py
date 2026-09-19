@@ -111,13 +111,8 @@ def get_deployment(
     *,
     workspace_id: int = DEFAULT_WORKSPACE_ID,
 ) -> Deployment:
-    deployment = session.scalar(
-        select(Deployment).where(
-            Deployment.id == deployment_id,
-            Deployment.workspace_id == workspace_id,
-        )
-    )
-    if deployment is None:
+    deployment = session.get(Deployment, deployment_id)
+    if deployment is None or deployment.workspace_id != workspace_id:
         raise DeploymentNotFoundError(deployment_id)
     return deployment
 

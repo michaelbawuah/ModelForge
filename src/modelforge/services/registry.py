@@ -68,13 +68,8 @@ def get_model(
     *,
     workspace_id: int = DEFAULT_WORKSPACE_ID,
 ) -> Model:
-    model = session.scalar(
-        select(Model).where(
-            Model.id == model_id,
-            Model.workspace_id == workspace_id,
-        )
-    )
-    if model is None:
+    model = session.get(Model, model_id)
+    if model is None or model.workspace_id != workspace_id:
         raise ModelNotFoundError(model_id)
     return model
 

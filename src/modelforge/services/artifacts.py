@@ -178,7 +178,7 @@ class LocalArtifactStore:
     def verify(self, uri: str, expected_checksum: str) -> bool:
         path = self._managed_path(uri)
         if not path.is_file():
-            raise ArtifactNotFoundError(f"Artifact not found: {path}")
+            raise ArtifactNotFoundError(f"Artifact does not exist: {path}")
 
         if sha256_file(path) != expected_checksum:
             raise ArtifactIntegrityError(

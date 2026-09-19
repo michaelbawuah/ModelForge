@@ -34,7 +34,7 @@ The reference Go runtime runs as a separate HTTP service and participates in the
 
 ### 5. Claims are measured
 
-The repository includes reproducible load generation, fault injection, CI artifacts, p50/p95/p99 latency, throughput, error-rate, and traffic-lane reporting.
+The repository includes reproducible load generation, fault injection, CI artifacts, p50/p95/p99 latency, throughput, error-rate, and traffic-lane reporting. A recruiter-proof harness also exercises stable serving, weighted canary traffic, promotion, rollback, regression detection, canary abort, and final stable-target preservation through the public API.
 
 ## 60-second interview answer
 
@@ -58,13 +58,17 @@ Then I added reliability: retries, exponential backoff, circuit breakers, health
 ## Demo script
 
 1. Start the stack with `docker compose up --build --wait --detach`.
-2. Seed the demo with `python demo/bootstrap_demo.py --environment demo --weight 20`.
+2. Run `make proof`.
 3. Open `http://localhost:8000/` to show the public product, then enter `/dashboard` for the SaaS console.
-4. Show stable and canary deployment targets.
-5. Run live predictions and point out deployment ID, model-version ID, traffic lane, cache state, and canary fallback metadata.
-6. Run `modelforge runtimes` to show the Go runtime health and circuit state.
-7. Reweight or promote the canary from the dashboard or CLI.
-8. Point to the benchmark/fault-injection section and explain how resilience behavior is measured.
+4. Open `demo-proof-evidence/proof-report.md` and show that v2 received real weighted canary traffic before promotion.
+5. Show that the proof promoted v2 and then rolled back to v1 through the deployment lifecycle.
+6. Show the intentionally regressed v3 canary: the proof detects its output drift, aborts it, and ModelForge records the deployment as `FAILED` with a failure reason.
+7. Show that the final environment target still points to stable v1 with no canary configured.
+8. Run `modelforge runtimes` to show the Go runtime health and circuit state, then connect the same lifecycle to the AWS/Terraform/release-automation story.
+
+The same proof harness accepts `MODELFORGE_URL`, `MODELFORGE_API_KEY`, and
+`MODELFORGE_WORKSPACE`, so the identical scenario can be run against a hosted
+multi-tenant deployment without modifying the script.
 
 ## Validated metrics to use carefully
 

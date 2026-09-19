@@ -125,6 +125,12 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       aws_iam_role.api_task.arn,
       aws_iam_role.runtime_task.arn,
     ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["ecs-tasks.amazonaws.com"]
+    }
   }
 }
 

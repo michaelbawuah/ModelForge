@@ -408,8 +408,8 @@ def create_login_challenge(
     *,
     redirect_path: str,
     ttl: timedelta = timedelta(minutes=10),
-) -> tuple[str, str]:
-    """Persist server-side OIDC state and PKCE verifier."""
+) -> tuple[str, str, str]:
+    """Persist server-side OIDC state, nonce, and PKCE verifier."""
 
     now = _utcnow_naive()
     session.execute(
@@ -418,15 +418,17 @@ def create_login_challenge(
 
     state = token_urlsafe(32)
     verifier = token_urlsafe(64)
+    nonce = token_urlsafe(32)
     challenge = OidcLoginChallenge(
         state_hash=_hash_secret(state),
         code_verifier=verifier,
+        nonce=nonce,
         redirect_path=redirect_path,
         expires_at=now + ttl,
     )
     session.add(challenge)
     session.commit()
-    return state, verifier
+    return state, verifier, nonce
 
 
 def consume_login_challenge(

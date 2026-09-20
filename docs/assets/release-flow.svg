@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 430" role="img" aria-labelledby="title desc">
+  <title id="title">Progressive model releases</title>
+  <desc id="desc">A registered stable model serves most requests while an immutable candidate receives canary traffic, then is promoted or aborted without losing the stable target.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0e192c"/>
+      <stop offset="1" stop-color="#101c2a"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1 1L7 4L1 7" fill="none" stroke="#a3b5d1" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="430" rx="20" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1278" height="428" rx="19" fill="none" stroke="#667fa8" stroke-opacity=".3"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="55" y="58" font-size="27" font-weight="750" fill="#f3f6ff">A controlled path from candidate to production</text>
+    <text x="55" y="86" font-size="15" fill="#9eafca">Illustrative traffic split · actual validation runs through the ModelForge API</text>
+    <rect x="55" y="122" width="278" height="230" rx="16" fill="#14223a" stroke="#637ba5" stroke-opacity=".5"/>
+    <text x="75" y="153" font-size="13" font-weight="700" letter-spacing="1" fill="#96aed3">MODEL REGISTRY</text>
+    <rect x="74" y="173" width="240" height="62" rx="10" fill="#1d3344" stroke="#62ccb2" stroke-opacity=".46"/>
+    <circle cx="95" cy="204" r="7" fill="#76dcc4"/>
+    <text x="111" y="200" font-size="17" font-weight="700" fill="#e7f6f1">v1.0.0 · stable</text>
+    <text x="111" y="219" font-size="12" fill="#a4c3ba">verified artifact</text>
+    <rect x="74" y="251" width="240" height="62" rx="10" fill="#222d50" stroke="#839bfb" stroke-opacity=".48"/>
+    <circle cx="95" cy="282" r="7" fill="#9fb0ff"/>
+    <text x="111" y="278" font-size="17" font-weight="700" fill="#eceeff">v2.0.0 · candidate</text>
+    <text x="111" y="297" font-size="12" fill="#b1b9de">immutable version</text>
+    <path d="M337 237H391" fill="none" stroke="#98a9c4" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="399" y="122" width="397" height="230" rx="16" fill="#14223a" stroke="#637ba5" stroke-opacity=".5"/>
+    <text x="421" y="153" font-size="13" font-weight="700" letter-spacing="1" fill="#96aed3">SERVING TARGET</text>
+    <text x="421" y="191" font-size="19" font-weight="700" fill="#e6eeff">Weighted canary routing</text>
+    <rect x="422" y="211" width="352" height="16" rx="8" fill="#6177bb"/>
+    <rect x="422" y="211" width="317" height="16" rx="8" fill="#67d7bb"/>
+    <circle cx="739" cy="219" r="9" fill="#b2bfff" stroke="#192943" stroke-width="3"/>
+    <text x="422" y="264" font-size="16" font-weight="700" fill="#84e5cc">90% stable</text>
+    <text x="653" y="264" font-size="16" font-weight="700" fill="#b9c5ff">10% canary</text>
+    <text x="422" y="309" font-size="14" fill="#9baec8">Record the version and lane that served each request.</text>
+    <path d="M800 190H858" fill="none" stroke="#98a9c4" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M800 294H858" fill="none" stroke="#98a9c4" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="865" y="122" width="359" height="99" rx="16" fill="#17373a" stroke="#6ed6bd" stroke-opacity=".58"/>
+    <circle cx="890" cy="155" r="10" fill="#74ddc4"/>
+    <path d="m885 155 4 4 7-9" fill="none" stroke="#112c2b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="914" y="161" font-size="20" font-weight="750" fill="#e8fff8">Promote</text>
+    <text x="889" y="193" font-size="14" fill="#b5d8d0">Candidate becomes the stable target.</text>
+    <rect x="865" y="237" width="359" height="115" rx="16" fill="#25283e" stroke="#9aa4df" stroke-opacity=".52"/>
+    <circle cx="890" cy="273" r="10" fill="#b7bdff"/>
+    <path d="M894 273h-9m0 0 4-4m-4 4 4 4" fill="none" stroke="#1d2940" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="914" y="280" font-size="20" font-weight="750" fill="#eceeff">Abort or roll back</text>
+    <text x="889" y="309" font-size="14" fill="#bec5e8">Restore or preserve the known stable version.</text>
+    <text x="55" y="392" font-size="14" fill="#9eaec6">Runtime failures can also remove a failing canary and fall back to stable serving.</text>
+  </g>
+</svg>

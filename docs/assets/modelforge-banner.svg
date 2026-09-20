@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" role="img" aria-labelledby="title desc">
+  <title id="title">ModelForge</title>
+  <desc id="desc">A dark blue graphic showing ModelForge beside a stylized model release control plane.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#101b32"/>
+      <stop offset=".55" stop-color="#0b1425"/>
+      <stop offset="1" stop-color="#101b2c"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#91a8ff"/>
+      <stop offset="1" stop-color="#69e0c7"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#546dc7" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#546dc7" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#b6c8f6" stroke-opacity=".045"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="400" rx="24" fill="url(#background)"/>
+  <rect width="1280" height="400" rx="24" fill="url(#grid)"/>
+  <circle cx="1050" cy="122" r="310" fill="url(#glow)"/>
+  <path d="M0 300C180 230 280 380 502 300S800 330 1280 170" fill="none" stroke="#819cfa" stroke-opacity=".1" stroke-width="2"/>
+  <rect x="66" y="62" width="54" height="54" rx="15" fill="url(#accent)"/>
+  <text x="93" y="99" text-anchor="middle" font-size="29" font-weight="800" font-family="Arial, Helvetica, sans-serif" fill="#0b1828">M</text>
+  <text x="137" y="98" font-size="27" font-weight="750" font-family="Arial, Helvetica, sans-serif" letter-spacing="-.6" fill="#dfe7fa">ModelForge</text>
+  <text x="66" y="187" font-size="51" font-weight="750" font-family="Arial, Helvetica, sans-serif" letter-spacing="-2" fill="#ffffff">Deploy any model.</text>
+  <text x="66" y="246" font-size="51" font-weight="750" font-family="Arial, Helvetica, sans-serif" letter-spacing="-2" fill="url(#accent)">Operate it safely.</text>
+  <text x="69" y="287" font-size="18" font-family="Arial, Helvetica, sans-serif" fill="#a8b7d0">One control plane for model versions, canaries, runtimes, and rollback.</text>
+  <g font-size="12" font-weight="700" font-family="Arial, Helvetica, sans-serif" letter-spacing="1.2">
+    <rect x="66" y="329" width="170" height="30" rx="15" fill="#1d2b46" stroke="#526999" stroke-opacity=".4"/>
+    <text x="82" y="349" fill="#afc1ff">IMMUTABLE VERSIONS</text>
+    <rect x="246" y="329" width="159" height="30" rx="15" fill="#163333" stroke="#3e8979" stroke-opacity=".55"/>
+    <text x="263" y="349" fill="#8ce5d1">CANARY RELEASES</text>
+    <rect x="415" y="329" width="174" height="30" rx="15" fill="#1d2b46" stroke="#526999" stroke-opacity=".4"/>
+    <text x="432" y="349" fill="#afc1ff">PLUGGABLE RUNTIMES</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="728" y="66" width="482" height="276" rx="18" fill="#111d31" stroke="#8097ba" stroke-opacity=".3"/>
+    <path d="M746 67H1192Q1210 67 1210 85V112H728V85Q728 67 746 67Z" fill="#18263e"/>
+    <circle cx="755" cy="91" r="5" fill="#ff8497"/>
+    <circle cx="774" cy="91" r="5" fill="#f4c676"/>
+    <circle cx="793" cy="91" r="5" fill="#6ee0c3"/>
+    <text x="823" y="97" font-size="14" fill="#a9bbd7">release / production</text>
+    <rect x="751" y="136" width="436" height="65" rx="10" fill="#18283e" stroke="#79a4cf" stroke-opacity=".22"/>
+    <circle cx="773" cy="168" r="6" fill="#6de0bf"/>
+    <text x="792" y="165" font-size="14" font-weight="700" fill="#edf3ff">Stable · model v1</text>
+    <text x="792" y="184" font-size="12" fill="#98abc6">immutable artifact · healthy</text>
+    <text x="1132" y="175" font-size="20" font-weight="700" fill="#78e3c8">90%</text>
+    <rect x="751" y="213" width="436" height="65" rx="10" fill="#18283e" stroke="#8da4f4" stroke-opacity=".3"/>
+    <circle cx="773" cy="245" r="6" fill="#91aaff"/>
+    <text x="792" y="241" font-size="14" font-weight="700" fill="#edf3ff">Canary · model v2</text>
+    <text x="792" y="261" font-size="12" fill="#98abc6">evaluating live traffic</text>
+    <text x="1132" y="252" font-size="20" font-weight="700" fill="#a9baff">10%</text>
+    <path d="M776 308H984" stroke="#52627d" stroke-width="7" stroke-linecap="round"/>
+    <path d="M776 308H904" stroke="#7d9dfa" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="906" cy="308" r="8" fill="#91aaff"/>
+    <text x="1005" y="313" font-size="13" fill="#8fa1bc">promote · abort · roll back</text>
+  </g>
+</svg>

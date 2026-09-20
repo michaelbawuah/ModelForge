@@ -169,7 +169,7 @@ jobs:
         run: |
           modelforge deployments --environment ci-demo > cli-deployments.json
           modelforge predict ci-demo 10 > cli-prediction.json
-      - name: Run recruiter deployment proof
+      - name: Validate deployment lifecycle
         run: >-
           python demo/proof_scenario.py
           --environment ci-proof

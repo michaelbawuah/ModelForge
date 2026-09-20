@@ -391,7 +391,7 @@ be captured on controlled hardware.
 
 The latest validation also smoke-tests the installed CLI, public landing page,
 multi-tenant SaaS console, auth configuration, Docker Compose stack, external Go
-runtime, and the full recruiter deployment proof. In that proof, v2 received
+runtime, and the full deployment validation scenario. In that scenario, v2 received
 real weighted canary traffic and was promoted, v1 was restored through rollback,
 and an intentionally regressed v3 produced 185.7% output drift against a 50%
 threshold, was recorded FAILED, and left v1 as the authoritative final target.
@@ -410,8 +410,8 @@ This creates the foundation for measuring reliability and performance rather tha
 - [External runtime contract](docs/runtime-protocol.md)
 - [Public-cloud deployment contract](docs/cloud-deployment.md)
 - [AWS ECS/Fargate reference deployment](infra/aws/README.md)
-- [Recruiter deployment proof](docs/demo-proof.md)
-- [Recruiter and interview brief](docs/recruiting.md)
+- [Deployment validation scenario](docs/demo-proof.md)
+- [Platform overview](docs/platform-overview.md)
 
 Common workflows are available through the root `Makefile`:
 

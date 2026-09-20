@@ -1,4 +1,4 @@
-"""Unit tests for the recruiter-visible deployment proof harness."""
+"""Unit tests for the deployment validation scenario."""
 
 from __future__ import annotations
 

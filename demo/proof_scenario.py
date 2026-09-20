@@ -1,4 +1,4 @@
-"""Run and capture a recruiter-visible ModelForge deployment proof."""
+"""Run and capture a ModelForge deployment validation scenario."""
 
 from __future__ import annotations
 
@@ -256,7 +256,7 @@ def run_proof(
                 json={
                     "name": model_name,
                     "description": (
-                        "Recruiter-proof model for canary promotion, rollback, "
+                        "Validation model for canary promotion, rollback, "
                         "and regression abort."
                     ),
                 },
@@ -575,7 +575,7 @@ def write_evidence(
     summary: dict[str, Any],
     samples: list[dict[str, Any]],
 ) -> None:
-    """Write machine-readable and recruiter-readable proof artifacts."""
+    """Write machine-readable evidence and a human-readable report."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "proof-summary.json").write_text(

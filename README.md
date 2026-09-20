@@ -58,16 +58,29 @@ through real API requests and records the results as JSON and Markdown evidence.
 
 ## Quick start
 
-Run the **local development stack** with Docker Compose:
+Want to look around first? [View the illustrated product preview](#product-preview).
+The application is not publicly hosted yet.
+
+To run the **local development stack**, install Docker with Compose, then run:
 
 ```bash
+git clone https://github.com/michaelbawuah/ModelForge.git
+cd ModelForge
 docker compose up --build --wait --detach
 ```
 
-Open the [landing page](http://localhost:8000/) or the
-[console](http://localhost:8000/dashboard). Then run the deployment scenario:
+When the containers are healthy, open `http://localhost:8000/` (landing page)
+or `http://localhost:8000/dashboard` (console) **on the same computer**.
+These addresses only work while your local stack is running; they are not
+links to an online instance.
+
+To run the optional deployment scenario, install Python 3.11+ and the project
+dependencies in a local environment, then run:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
 make proof
 ```
 

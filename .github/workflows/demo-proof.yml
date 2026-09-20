@@ -6,7 +6,7 @@ on:
       environment:
         description: "ModelForge serving environment name used for the proof."
         required: false
-        default: "recruiter-demo"
+        default: "validation-demo"
 
 permissions:
   contents: read

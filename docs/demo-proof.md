@@ -1,4 +1,4 @@
-# Recruiter Demo Proof
+# Deployment Validation Scenario
 
 This scenario is the shortest way to demonstrate ModelForge as a working ML
 deployment platform rather than a collection of API endpoints.
@@ -31,7 +31,7 @@ docker compose up --build --wait --detach
 Run the proof:
 
 ~~~bash
-python demo/proof_scenario.py   --environment recruiter-demo   --output-dir demo-proof-evidence
+python demo/proof_scenario.py --environment validation-demo --output-dir demo-proof-evidence
 ~~~
 
 The command exits non-zero if any lifecycle assertion fails.
@@ -45,7 +45,7 @@ export MODELFORGE_URL="https://YOUR_MODELFORGE_HOST"
 export MODELFORGE_API_KEY="mf_live_..."
 export MODELFORGE_WORKSPACE="YOUR_WORKSPACE_SLUG"
 
-python demo/proof_scenario.py   --environment recruiter-demo   --output-dir demo-proof-evidence
+python demo/proof_scenario.py --environment validation-demo --output-dir demo-proof-evidence
 ~~~
 
 The raw API key is used only as an HTTP Authorization header. It is never
@@ -57,8 +57,7 @@ The output directory contains:
 
 - proof-summary.json — compact machine-readable lifecycle evidence;
 - traffic-samples.jsonl — request-level model-version and traffic-lane proof;
-- proof-report.md — recruiter-readable summary suitable for a GitHub Actions
-  artifact or README screenshot.
+- proof-report.md — human-readable summary of the deployment lifecycle checks.
 
 The proof deliberately includes both a successful and unsuccessful release:
 

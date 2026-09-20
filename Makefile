@@ -26,7 +26,7 @@ demo:
 	python demo/bootstrap_demo.py --environment demo --weight 20
 
 proof:
-	python demo/proof_scenario.py --environment recruiter-demo --output-dir demo-proof-evidence
+	python demo/proof_scenario.py --environment validation-demo --output-dir demo-proof-evidence
 
 benchmark:
 	python benchmarks/bootstrap_external.py --environment benchmark-go

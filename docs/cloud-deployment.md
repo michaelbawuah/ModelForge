@@ -109,7 +109,7 @@ This keeps framework credentials out of runtime JSON configuration and gives fut
 4. Run `modelforge config-check` using the production environment.
 5. Run `alembic upgrade head` once as a release task.
 6. Start the API and external runtime services.
-7. Verify `/health` and `/ready`.
+7. Verify `/health` reports the released build SHA and `/ready` succeeds.
 8. Verify OIDC login and workspace creation.
 9. Create a workspace API key and exercise the CLI.
 10. Register a model, create a canary, run inference, promote, and roll back.

@@ -7,10 +7,12 @@ from modelforge.api.app import app
 client = TestClient(app)
 
 
-def test_health_reports_process_alive() -> None:
+def test_health_reports_process_alive(monkeypatch) -> None:
+    monkeypatch.setenv("MODELFORGE_BUILD_SHA", "a" * 40)
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+    assert response.json()["build_sha"] == "a" * 40
 
 
 def test_readiness_checks_database() -> None:

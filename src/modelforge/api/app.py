@@ -1,5 +1,7 @@
 """HTTP entry point for the ModelForge control plane."""
 
+import os
+
 from fastapi import FastAPI
 
 from modelforge.api.browser_auth import router as browser_auth_router
@@ -35,6 +37,7 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": "modelforge-api",
+            "build_sha": os.getenv("MODELFORGE_BUILD_SHA", "unknown"),
         }
 
     app.include_router(dashboard_router)

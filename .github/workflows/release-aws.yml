@@ -128,7 +128,11 @@ jobs:
           if aws ecr describe-images             --repository-name "${{ steps.release.outputs.api_repository }}"             --image-ids "imageTag=${{ steps.release.outputs.tag }}"             >/dev/null 2>&1; then
             echo "API image already exists for this commit; reusing immutable tag."
           else
-            docker build               --platform linux/amd64               --tag "${{ steps.release.outputs.api_image }}"               .
+            docker build \
+              --platform linux/amd64 \
+              --build-arg "MODELFORGE_BUILD_SHA=${GITHUB_SHA}" \
+              --tag "${{ steps.release.outputs.api_image }}" \
+              .
             docker push "${{ steps.release.outputs.api_image }}"
           fi
 
@@ -279,14 +283,22 @@ jobs:
           BASE_URL="${MODELFORGE_PUBLIC_URL%/}"
 
           for attempt in $(seq 1 24); do
-            if curl --fail --silent --show-error "${BASE_URL}/health" >/dev/null               && curl --fail --silent --show-error "${BASE_URL}/ready" >/dev/null; then
-              printf '{"status":"healthy","url":"%s","image_tag":"%s","commit":"%s"}\n'                 "${BASE_URL}"                 "${{ steps.release.outputs.tag }}"                 "${GITHUB_SHA}"                 > release-summary.json
+            if HEALTH_JSON="$(curl --fail --silent --show-error "${BASE_URL}/health")" \
+              && jq -e --arg sha "${GITHUB_SHA}" \
+                '.status == "healthy" and .build_sha == $sha' \
+                <<<"${HEALTH_JSON}" >/dev/null \
+              && curl --fail --silent --show-error "${BASE_URL}/ready" >/dev/null; then
+              jq -n \
+                --arg url "${BASE_URL}" \
+                --arg sha "${GITHUB_SHA}" \
+                '{status: "healthy", url: $url, image_tag: $sha, commit: $sha}' \
+                > release-summary.json
               exit 0
             fi
             sleep 5
           done
 
-          echo "Post-deploy health verification failed." >&2
+          echo "Post-deploy verification failed: expected the new build SHA and a ready service." >&2
           exit 1
 
       - name: Roll back services after deployment failure

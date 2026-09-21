@@ -224,6 +224,18 @@ variable "github_repository" {
   default     = "michaelbawuah/ModelForge"
 }
 
+variable "github_repository_owner_id" {
+  description = "Immutable GitHub owner ID for the deploy role's OIDC subject. Update for a different owner."
+  type        = string
+  default     = "273423923"
+}
+
+variable "github_repository_id" {
+  description = "Immutable GitHub repository ID for the deploy role's OIDC subject. Update for a fork."
+  type        = string
+  default     = "1373471661"
+}
+
 variable "github_environment" {
   description = "GitHub environment encoded into the OIDC subject for production releases."
   type        = string
